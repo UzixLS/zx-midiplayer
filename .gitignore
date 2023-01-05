@@ -1,0 +1,12 @@
+/.tmp
+/.vscode
+~*
+*~
+*.log
+*.sld
+*.sna
+*.z80
+*.tap
+*.tzx
+*.trd
+*.scl
