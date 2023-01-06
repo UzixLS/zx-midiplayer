@@ -17,8 +17,8 @@ data          BLOCK 0
 
     STRUCT smf_file_t
 num_tracks    BYTE
-track_ptr     WORD
-track_len     WORD
+track_pos     WORD
+track_pos_end WORD
 last_status   BYTE
 ppqn          WORD
 tempo         DWORD
@@ -31,76 +31,66 @@ tick_delay_loop_len = 8    ; us
 tick_delay_correction = 14 ; № of delay loops to skip
 
 
-; IN  - IX - pointer to beginning of file
+; IN  - HL - position of beginning of file
 ; OUT -  F - Z = 0 on success, 1 on error
-; OUT - IX - pointer to next byte after end of chunk
+; OUT - HL - position of next byte after end of chunk
 ; OUT - AF - garbage
 ; OUT - BC - garbage
 smf_parse_file_header:
-    ld a, (ix+chunk_header_t.id+0) : cp 'M' : ret nz
-    ld a, (ix+chunk_header_t.id+1) : cp 'T' : ret nz
-    ld a, (ix+chunk_header_t.id+2) : cp 'h' : ret nz
-    ld a, (ix+chunk_header_t.id+3) : cp 'd' : ret nz
-    ld a, (ix+chunk_header_t.len+0) : cp 0 : ret nz
-    ld a, (ix+chunk_header_t.len+1) : cp 0 : ret nz
-    ld a, (ix+chunk_header_t.len+2) : cp 0 : ret nz
-    ld a, (ix+chunk_header_t.len+3) : cp 6 : ret nz
-    ld a, (ix+chunk_mthd_t.format+0) : cp 0 : ret nz
-    ld a, (ix+chunk_mthd_t.format+1) : cp 0 : ret nz
-    ld a, (ix+chunk_mthd_t.num_tracks+0) : cp 0 : ret nz
-    ld a, (ix+chunk_mthd_t.num_tracks+1) : ld (var_smf_file.num_tracks), a
-    ld a, (ix+chunk_mthd_t.division+0) : ld (var_smf_file.ppqn+1), a ; MIDI is big endian, Z80 is little endian
-    ld a, (ix+chunk_mthd_t.division+1) : ld (var_smf_file.ppqn+0), a ; XXX
-    ld bc, chunk_mthd_t ; MThd len
-    add ix, bc
+    call file_get_next_byte : cp 'M' : ret nz ; chunk_header_t.id[0]
+    call file_get_next_byte : cp 'T' : ret nz ; chunk_header_t.id[1]
+    call file_get_next_byte : cp 'h' : ret nz ; chunk_header_t.id[2]
+    call file_get_next_byte : cp 'd' : ret nz ; chunk_header_t.id[3]
+    call file_get_next_byte : cp 0   : ret nz ; chunk_header_t.len[0]
+    call file_get_next_byte : cp 0   : ret nz ; chunk_header_t.len[1]
+    call file_get_next_byte : cp 0   : ret nz ; chunk_header_t.len[2]
+    call file_get_next_byte : cp 6   : ret nz ; chunk_header_t.len[3]
+    call file_get_next_byte : cp 0   : ret nz ; chunk_mthd_t.format[0]
+    call file_get_next_byte : cp 0   : ret nz ; chunk_mthd_t.format[1]
+    call file_get_next_byte : cp 0   : ret nz ; chunk_mthd_t.num_tracks[0]
+    call file_get_next_byte : ld (var_smf_file.num_tracks), a ; chunk_mthd_t.num_tracks[1]
+    call file_get_next_byte : ld (var_smf_file.ppqn+1), a ; chunk_mthd_t.division[0]
+    call file_get_next_byte : ld (var_smf_file.ppqn+0), a ; chunk_mthd_t.division[1]
     ret
 
-; IN  - IX - pointer to file
+; IN  - HL - position in file
 ; OUT -  F - Z = 0 on success, 1 on error
-; OUT - IX - pointer to next byte after end of chunk
+; OUT - HL - position of next byte after end of chunk
 ; OUT - AF - garbage
 ; OUT - BC - garbage
 smf_parse_track_header:
-    ld a, (ix+chunk_header_t.id+0) : cp 'M' : ret nz
-    ld a, (ix+chunk_header_t.id+1) : cp 'T' : ret nz
-    ld a, (ix+chunk_header_t.id+2) : cp 'r' : ret nz
-    ld a, (ix+chunk_header_t.id+3) : cp 'k' : ret nz
-    ld a, (ix+chunk_header_t.len+0) : cp 0 : ret nz
-    ld a, (ix+chunk_header_t.len+1) : cp 0 : ret nz
-    ld b, (ix+chunk_header_t.len+2)
-    ld c, (ix+chunk_header_t.len+3)
-    ld (var_smf_file.track_len), bc
-    ld bc, chunk_mtrk_t
-    add ix, bc
-    ld (var_smf_file.track_ptr), ix
-    ld bc, (var_smf_file.track_len)
-    add ix, bc
+    call file_get_next_byte : cp 'M' : ret nz ; chunk_header_t.id+0
+    call file_get_next_byte : cp 'T' : ret nz ; chunk_header_t.id+1
+    call file_get_next_byte : cp 'r' : ret nz ; chunk_header_t.id+2
+    call file_get_next_byte : cp 'k' : ret nz ; chunk_header_t.id+3
+    call file_get_next_byte : cp 0 : ret nz   ; chunk_header_t.len+0
+    call file_get_next_byte : cp 0 : ret nz   ; chunk_header_t.len+1
+    call file_get_next_byte : ld b, a         ; chunk_header_t.len+2
+    call file_get_next_byte : ld c, a         ; chunk_header_t.len+3
+    ld (var_smf_file.track_pos), hl           ; save position to begin of track data
+    add hl, bc                                ; save position to end of track data
+    ld (var_smf_file.track_pos_end), hl       ; ...
+    jr c, .len_overflow                       ; check if track is bigger than file
+    xor a                                     ; set Z flag
+    ret
+.len_overflow:
+    or 1                                      ; reset Z flag
     ret
 
-; IN  - IX - pointer to file
 ; OUT -  F - Z = 0 on success, 1 on error
+; OUT - HL - file position of first track data byte
 smf_parse:
+    ld bc, (default_tempo>> 0)&0xFFFF : ld (var_smf_file.tempo+0), bc
+    ld bc, (default_tempo>>16)&0xFFFF : ld (var_smf_file.tempo+2), bc
+    ld hl, 0
     call smf_parse_file_header
     ret nz
     call smf_parse_track_header
-    ld bc, (default_tempo >>  0)&0xFFFF : ld (var_smf_file.tempo+0), bc
-    ld bc, (default_tempo >> 16)&0xFFFF : ld (var_smf_file.tempo+2), bc
+    ret nz
     call smf_update_tick_duration
+    ld hl, (var_smf_file.track_pos)
+    xor a ; reset Z flag
     ret
-
-
-; IN  - HL - track position
-; OUT -  A - data
-; OUT - HL - next track position
-; OUT - IX - pointer to data byte
-smf_get_next_byte:
-    ld ix, (var_smf_file.track_ptr) ; IX = &track[position]
-    ex de, hl                       ; ...
-    add ix, de                      ; ...
-    ex de, hl                       ; ...
-    ld a, (ix)                      ; A = track[position]
-    inc hl                          ; position++
-    ret                             ;
 
 
 ; IN  - HL - track position
@@ -109,7 +99,7 @@ smf_get_next_byte:
 ; OUT - IX - pointer to last data byte
 ; OUT - AF - garbage
 smf_parse_varint:
-    call smf_get_next_byte    ; A = byte - fvvvvvvV - f - flag, v - value
+    call file_get_next_byte   ; A = byte - fvvvvvvV - f - flag, v - value
     ld b, 0                   ;
     ld c, a                   ;
     rlca                      ; if (flag == 0) - no more bytes, exit
@@ -119,7 +109,7 @@ smf_parse_varint:
     ld c, 0                   ; ...
     srl b                     ; ... B = 00vvvvvv; Cflag = bit0
     rr c                      ; ... C = V0000000
-    call smf_get_next_byte    ; A = byte - fvvvvvvv
+    call file_get_next_byte   ; A = byte - fvvvvvvv
     rlca                      ;
     jr c, .have_more_bytes    ;
     srl a                     ; A = 0vvvvvvv
@@ -129,7 +119,7 @@ smf_parse_varint:
 .have_more_bytes:
     ld bc, #3fff              ; set max value 0x3FFF, all other bytes will be skipped
 .loop:
-    call smf_get_next_byte    ; loop until all varint bytes skipped
+    call file_get_next_byte   ; loop until all varint bytes skipped
     rlca                      ; ...
     jr c, .loop               ; ...
     ret                       ;
@@ -144,7 +134,7 @@ smf_parse_varint:
 ; OUT - IX - garbage
 smf_get_next_status:
     ex hl, de                                 ; check if end of track reached
-    ld hl, (var_smf_file.track_len)           ; ...
+    ld hl, (var_smf_file.track_pos_end)       ; ...
     or a                                      ; clear C flag
     sbc hl, de                                ; if (HL==DE) Z=1,C=0; if (HL<DE) Z=0,C=1; if (HL>DE) Z=0,C=0
     ex hl, de                                 ; ...
@@ -154,7 +144,7 @@ smf_get_next_status:
     call smf_parse_varint                     ; BC = time delta
     ld d, b : ld e, c                         ; DE = BC
 .parse_status_byte:
-    call smf_get_next_byte                    ; A = byte
+    call file_get_next_byte                   ; A = byte
     bit 7, a                                  ; if this isn't status byte - reuse last one ("Running Status")
     jr nz, .is_meta_event                     ; ...
     ld a, (var_smf_file.last_status)          ; ...
@@ -202,6 +192,8 @@ smf_get_next_status:
 1:  xor a                                     ; not valid command, set to zero
     ret
 
+
+; TODO: SMPTE; negative 'division' field value
 
 ; OUT - HL - tick duration
 ; OUT - AF - garbage
@@ -271,7 +263,7 @@ smf_handle_meta:
     ld a, b                      ; if (len == 0) - exit
     or c                         ; ...
     ret z                        ; ...
-    call smf_get_next_byte       ; A = cmd
+    call file_get_next_byte      ; A = cmd
     dec bc                       ; ...
 .tempo:
     cp #51                       ; tempo
@@ -284,13 +276,13 @@ smf_handle_meta:
     jr nz, .exit                 ; ...
     inc hl                       ; skip ll
     dec bc                       ; ...
-    call smf_get_next_byte       ; tempo = tt tt tt
+    call file_get_next_byte      ; tempo = tt tt tt
     dec bc                       ; ...
     ld (var_smf_file.tempo+2), a ; ... MIDI is big endian, Z80 is little endian
-    call smf_get_next_byte       ; ...
+    call file_get_next_byte      ; ...
     dec bc                       ; ...
     ld (var_smf_file.tempo+1), a ; ...
-    call smf_get_next_byte       ; ...
+    call file_get_next_byte      ; ...
     dec bc                       ; ...
     ld (var_smf_file.tempo+0), a ; ...
     push bc                      ;
@@ -306,8 +298,6 @@ smf_handle_meta:
     dec bc                       ; ...
     push bc                      ;
     push hl                      ;
-    inc ix                       ; skip cmd and ll
-    inc ix                       ; ...
     call player_set_title        ;
     pop hl                       ;
     pop bc                       ;

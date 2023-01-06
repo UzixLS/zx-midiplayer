@@ -1,4 +1,4 @@
-export PATH:=/cygdrive/c/Hwdev/sjasmplus/:/cygdrive/e/Emulation/ZX Spectrum/Utils/fuse-utils/:/cygdrive/e/Emulation/ZX Spectrum/Emuls/UnrealSpeccy/: /cygdrive/e/Emulation/ZX\ Spectrum/Utils/fuse-utils/:${PATH}
+export PATH:=/cygdrive/c/Hwdev/sjasmplus/:/cygdrive/e/Emulation/ZX Spectrum/Utils/fuse-utils/:/cygdrive/e/Emulation/ZX Spectrum/Emuls/Es.Pectrum/:${PATH}
 
 SJOPTS=
 
@@ -16,5 +16,7 @@ clean:
 %.tzx: %.sna
 	snap2tzx $<
 
-run: main.sna
-	unreal $<
+run: main.tzx
+	EsPectrum $<
+
+-include Makefile.local

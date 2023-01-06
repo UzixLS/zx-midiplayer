@@ -54,6 +54,7 @@ loop:
     jr loop
 
     include "layout.asm"
+    include "file.asm"
     include "uart.asm"
     include "math.asm"
     include "smf.asm"
@@ -71,9 +72,13 @@ stack_bottom:
     org #BFFF
 stack_top:
 
-    org #C000
+    org #C000,0
 testmid:
-    incbin "test0.mid"
+    incbin "test0.mid",0,#4000
+    org #C000,4
+    incbin "test0.mid",#4000,#4000
+    org #C000,6
+    incbin "test0.mid",#8000
     ; incbin "test1.mid"
 
 end:
