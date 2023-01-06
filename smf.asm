@@ -22,10 +22,13 @@ track_len     WORD
 last_status   BYTE
 ppqn          WORD
 tempo         DWORD
-ticks_per_int WORD 17 ; XXX
+tick_duration WORD
     ENDS
 
 
+default_tempo = 500000     ; defined by MIDI standard
+tick_delay_loop_len = 8    ; us
+tick_delay_correction = 14 ; № of delay loops to skip
 
 
 ; IN  - IX - pointer to beginning of file
@@ -80,8 +83,9 @@ smf_parse:
     call smf_parse_file_header
     ret nz
     call smf_parse_track_header
-    ld bc, #A120 : ld (var_smf_file.tempo+0), bc ; default tempo = 0x07A120
-    ld bc, #0007 : ld (var_smf_file.tempo+2), bc ; ...
+    ld bc, (default_tempo >>  0)&0xFFFF : ld (var_smf_file.tempo+0), bc
+    ld bc, (default_tempo >> 16)&0xFFFF : ld (var_smf_file.tempo+2), bc
+    call smf_update_tick_duration
     ret
 
 
@@ -187,42 +191,81 @@ smf_get_next_status:
     ld ixl, a                                 ;
     and #f0                                   ; "sssscccc" - s - status byte, c - channel number
     ld bc, 2                                  ;
-    cp #90 : jr nz, 1F         : or ixl : ret ; note on
-1:  cp #80 : jr nz, 1F         : or ixl : ret ; note off
-1:  cp #a0 : jr nz, 1F         : or ixl : ret ; key after-touch
-1:  cp #b0 : jr nz, 1F         : or ixl : ret ; control change
-1:  cp #c0 : jr nz, 1F : dec c : or ixl : ret ; program (patch) change
-1:  cp #d0 : jr nz, 1F : dec c : or ixl : ret ; channel after-touch (aka "channel pressure")
-1:  cp #e0 : jr nz, 1F         : or ixl : ret ; pitch wheel change
+    cp #90 : jr nz, 1f         : or ixl : ret ; note on
+1:  cp #80 : jr nz, 1f         : or ixl : ret ; note off
+1:  cp #a0 : jr nz, 1f         : or ixl : ret ; key after-touch
+1:  cp #b0 : jr nz, 1f         : or ixl : ret ; control change
+1:  cp #c0 : jr nz, 1f : dec c : or ixl : ret ; program (patch) change
+1:  cp #d0 : jr nz, 1f : dec c : or ixl : ret ; channel after-touch (aka "channel pressure")
+1:  cp #e0 : jr nz, 1f         : or ixl : ret ; pitch wheel change
 .eof:
 1:  xor a                                     ; not valid command, set to zero
     ret
 
 
-; IN  - DE - ticks count
+; OUT - HL - tick duration
 ; OUT - AF - garbage
+; OUT - BC - garbage
 ; OUT - DE - garbage
+; OUT - IX - garbage
+smf_update_tick_duration:                     ; = tempo/ppqn/tick_delay_loop_len - tick_delay_correction
+    ld a, (var_smf_file.tempo+2)              ; ACIX = tempo
+    ld c, a                                   ; ...
+    xor a                                     ; ... tempo is 24 bit value
+    ld ix, (var_smf_file.tempo)               ; ...
+    ld de, (var_smf_file.ppqn)                ;
+    call div32by16                            ; ACIX = tempo/ppqn
+    ld d, ixh : ld e, ixl                     ; ACDE = ACIX
+    assert tick_delay_loop_len == 8           ; power of 2
+    srl a : rr c : rr d : rr e                ; ACDE = ACDE/tick_delay_loop_len
+    srl a : rr c : rr d : rr e                ; ...
+    srl a : rr c : rr d : rr e                ; ...
+    or c                                      ; if (result > 0xFFFF) result = 0xFFFF
+    jr z, 1f                                  ; ...
+    ld hl, #ffff                              ; ...
+    jp .save                                  ; ...
+1:  ld bc, tick_delay_correction              ;
+    ex hl, de                                 ;
+    sbc hl, bc                                ; HL = HL - tick_delay_correction
+    jp nc, .save                              ; if (result < 0) result = 0
+    ld hl, 0                                  ; ...
+.save:
+    ld (var_smf_file.tick_duration), hl       ;
+    ret                                       ;
+
+
+; IN  - DE - ticks count
+; OUT - DE - 0
+; OUT - AF - garbage
 smf_delay:
     ld a, d
     or e
     ret z
     push bc
     push hl
-    ld bc, (var_smf_file.ticks_per_int)
-    ld h, d : ld l, e
-.delay:
-    ei
-    halt
-    sbc hl, bc
-    jr nc, .delay
+.delay_loop:
+    ld bc, (var_smf_file.tick_duration) ; (20)
+.delay_inner_loop:                      ; CPU freq = 3.5MHz: (4+6+4+4+10) * 1e6/3.5e6 = 8us (see tick_delay_loop_len)
+    nop                                 ; (4)
+    dec bc                              ; (6)
+    ld a, b                             ; (4)
+    or c                                ; (4)
+    jp nz, .delay_inner_loop            ; (10)
+    dec de                              ; (6)
+    ld a, d                             ; (4)
+    or e                                ; (4)
+    jp nz, .delay_loop                  ; (10)
     pop hl
     pop bc
     ret
+
 
 ; IN  - BC - data len
 ; IN  - HL - track position
 ; OUT - HL - next track position
 ; OUT - AF - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
 ; OUT - IX - garbage
 smf_handle_meta:
     ld a, b                      ; if (len == 0) - exit
@@ -250,6 +293,11 @@ smf_handle_meta:
     call smf_get_next_byte       ; ...
     dec bc                       ; ...
     ld (var_smf_file.tempo+0), a ; ...
+    push bc                      ;
+    push hl                      ;
+    call smf_update_tick_duration;
+    pop hl                       ;
+    pop bc                       ;
     jp .exit                     ;
 .title:
     cp #03                       ; track title

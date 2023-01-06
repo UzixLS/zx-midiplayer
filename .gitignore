@@ -10,3 +10,4 @@
 *.tzx
 *.trd
 *.scl
+Makefile.local

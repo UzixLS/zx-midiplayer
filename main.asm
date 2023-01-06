@@ -55,6 +55,7 @@ loop:
 
     include "layout.asm"
     include "uart.asm"
+    include "math.asm"
     include "smf.asm"
     include "player.asm"
     include "draw.asm"
