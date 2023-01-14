@@ -1,8 +1,9 @@
 ; IN  - HL - file position of first track data byte
 player_loop:
-    di
     ld a, #ff                      ; issue reset status
     call uart_putc                 ; ...
+    ei
+    halt
 .next_status:
     call smf_get_next_status       ; A = status, HL = track position, BC = data len, DE = time delta
     or a                           ; if status = 0 then end
