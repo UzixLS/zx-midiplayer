@@ -10,6 +10,12 @@
     org #7777
 begin:
 int_handler:
+    push af
+    ld a, (var_int_counter+1)
+    inc a
+    ld (var_int_counter+1), a
+    pop af
+    ei
     ret
 
     org #8000

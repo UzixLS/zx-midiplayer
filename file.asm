@@ -17,6 +17,7 @@ file_base_addr = 0xC000
 ; IN  - HL - file position
 ; OUT -  A - data
 ; OUT - HL - next file position
+; OUT -  F - garbage
 file_get_next_byte:
     push bc                                                          ;
     push hl                                                          ;
