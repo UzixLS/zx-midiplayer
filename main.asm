@@ -32,7 +32,7 @@ main:
     ld a, #10      ; page BASIC48
     ld bc, #7ffd   ; ...
     out (c), a     ; ...
-    ld a, #01      ; set border
+    ld a, #01      ; set blue border
     out (#fe), a   ; ...
     call uart_init ;
 
@@ -52,9 +52,11 @@ main:
 
     ld ix, testmid
     call smf_parse
+    jr nz, loop
     call player_loop
-
 loop:
+    ld a, #02      ; set red border
+    out (#fe), a   ; ...
     ei
     halt
     jr loop

@@ -3,6 +3,7 @@ player_loop:
     ld a, #ff                      ; issue reset status
     di : call uart_putc : ei       ; ...
     halt : ei                      ; wait 20ms just for safety
+    call smf_get_first_track       ;
 .next_status:
     call smf_get_next_status       ; A = status, HL = track position, BC = data len, DE = time delta
     or a                           ; if status = 0 then end
@@ -21,15 +22,15 @@ player_loop:
     call smf_handle_meta           ; ... instead, process it locally. HL = next track position
     jp .next_status                ; ...
 .status_send:
-    ld iyh, b : ld iyl, c          ; IY = data len
+    ld ixh, b : ld ixl, c          ; IX = data len
     di : call uart_putc : ei       ; send status
 .data_send:
-    ld a, iyh                      ; if len == 0 then go for next status
-    or iyl                         ; ...
+    ld a, ixh                      ; if len == 0 then go for next status
+    or ixl                         ; ...
     jr z, .next_status             ; ...
     call file_get_next_byte        ; A = data
     di : call uart_putc : ei       ; send data
-    dec iy                         ; len--
+    dec ix                         ; len--
     jr .data_send                  ; ...
 .end:
     ld a, #ff                      ; issue reset status
