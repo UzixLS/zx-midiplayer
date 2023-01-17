@@ -3,35 +3,33 @@ player_loop:
     ld a, #ff                      ; issue reset status
     di : call uart_putc : ei       ; ...
     halt : ei                      ; wait 20ms just for safety
+.loop:
     call smf_get_first_track       ;
-.next_status:
-    call smf_get_next_status       ; A = status, HL = track position, BC = data len, DE = time delta
-    or a                           ; if status = 0 then end
-    jr z, .end                     ; ...
-    ld ixl, a                      ; save A
-    push af                        ;
-1:  push bc,hl                     ;
-    call smf_check_delay           ; wait
-    pop hl,bc                      ;
-    jr c, 1b                       ;
-    pop af                         ;
+    jr z, .end                     ;
+.process_current_track:
+    call smf_process_track         ; A = status, HL = track position, BC = data len
+    jp c, .next_track              ; if C == 1 (delayed) then go to the next track
+    jp z, .next_track              ; if Z == 1 (no data) then go to the next track
 .status_check:
-    ld a, ixl                      ; restore A (status)
     cp #ff                         ; do not send meta events to midi device
-    jr nz, .status_send            ; ...
+    jp nz, .status_send            ; ...
     call smf_handle_meta           ; ... instead, process it locally. HL = next track position
-    jp .next_status                ; ...
+    jp .process_current_track      ; ...
 .status_send:
     ld ixh, b : ld ixl, c          ; IX = data len
     di : call uart_putc : ei       ; send status
 .data_send:
     ld a, ixh                      ; if len == 0 then go for next status
     or ixl                         ; ...
-    jr z, .next_status             ; ...
+    jr z, .process_current_track   ; ...
     call file_get_next_byte        ; A = data
     di : call uart_putc : ei       ; send data
     dec ix                         ; len--
-    jr .data_send                  ; ...
+    jp .data_send                  ; ...
+.next_track:
+    call smf_get_next_track        ;
+    jr z, .loop                    ;
+    jp .process_current_track      ;
 .end:
     ld a, #ff                      ; issue reset status
     di : call uart_putc : ei       ; ...
