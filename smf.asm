@@ -21,18 +21,21 @@ ppqn              WORD
 tempo             DWORD
 tick_duration     WORD
 tracks            BLOCK max_tracks*smf_track_t
-_zerobyte         BYTE 0   ; this is read by smf_get_next_track and written by smf_parse (valid flag)
+_zerobyte         BYTE 0   ; this is read by smf_get_next_track and written by smf_parse (flags=0)
     ENDS
 
     STRUCT smf_track_t
-valid             BYTE
+flags             BYTE
 last_status       BYTE
 start             WORD
 end               WORD
 position          WORD
 int_acked_counter WORD
+wait_duration     DWORD
     ENDS
 
+SMF_TRACK_FLAGS_VALID  = 0
+SMF_TRACK_FLAGS_PLAY   = 1
 
 default_tempo = 500000     ; defined by MIDI standard
 max_tracks = 16
@@ -53,7 +56,8 @@ smf_parse_file_header:
     call file_get_next_byte : cp 0   : ret nz ; chunk_header_t.len[2]
     call file_get_next_byte : cp 6   : ret nz ; chunk_header_t.len[3]
     call file_get_next_byte : cp 0   : ret nz ; chunk_mthd_t.format[0]
-    call file_get_next_byte : cp 0   : ret nz ; chunk_mthd_t.format[1]
+    call file_get_next_byte :                 ; chunk_mthd_t.format[1]
+    or 1 : cp 1 : ret nz                      ; if (format != 0 && format != 1) - return error
     call file_get_next_byte : cp 0   : ret nz ; chunk_mthd_t.num_tracks[0]
     call file_get_next_byte : ld (var_smf_file.num_tracks), a ; chunk_mthd_t.num_tracks[1]
     cp max_tracks                                         ; if (num_tracks>max_tracks) - return error
@@ -72,28 +76,28 @@ smf_parse_file_header:
 ; OUT - AF - garbage
 ; OUT - BC - garbage
 smf_parse_track_header:
-    call file_get_next_byte : cp 'M' : ret nz ; chunk_header_t.id+0
-    call file_get_next_byte : cp 'T' : ret nz ; chunk_header_t.id+1
-    call file_get_next_byte : cp 'r' : ret nz ; chunk_header_t.id+2
-    call file_get_next_byte : cp 'k' : ret nz ; chunk_header_t.id+3
-    call file_get_next_byte : cp 0 : ret nz   ; chunk_header_t.len+0
-    call file_get_next_byte : cp 0 : ret nz   ; chunk_header_t.len+1
-    call file_get_next_byte : ld b, a         ; chunk_header_t.len+2
-    call file_get_next_byte : ld c, a         ; chunk_header_t.len+3
-    ld (iy+smf_track_t.start+0), l            ; save position to begin of track data
-    ld (iy+smf_track_t.start+1), h            ; ...
-    ld (iy+smf_track_t.position+0), l         ; save position to begin of track data
-    ld (iy+smf_track_t.position+1), h         ; ...
-    add hl, bc                                ; save position to end of track data
-    ld (iy+smf_track_t.end+0), l              ; ...
-    ld (iy+smf_track_t.end+1), h              ; ...
-    jr nc, 1f                                 ; check if track is bigger than file
-    or 1                                      ; ... if yes - reset Z flag
-    ret                                       ; ... and exit
-1:  ld a, 1                                   ; track_valid = 1
-    ld (iy+smf_track_t.valid), a              ; ...
-    xor a                                     ; set Z flag
-    ret                                       ;
+    call file_get_next_byte : cp 'M' : ret nz                  ; chunk_header_t.id+0
+    call file_get_next_byte : cp 'T' : ret nz                  ; chunk_header_t.id+1
+    call file_get_next_byte : cp 'r' : ret nz                  ; chunk_header_t.id+2
+    call file_get_next_byte : cp 'k' : ret nz                  ; chunk_header_t.id+3
+    call file_get_next_byte : cp 0 : ret nz                    ; chunk_header_t.len+0
+    call file_get_next_byte : cp 0 : ret nz                    ; chunk_header_t.len+1
+    call file_get_next_byte : ld b, a                          ; chunk_header_t.len+2
+    call file_get_next_byte : ld c, a                          ; chunk_header_t.len+3
+    ld (iy+smf_track_t.start+0), l                             ; save position to begin of track data
+    ld (iy+smf_track_t.start+1), h                             ; ...
+    ld (iy+smf_track_t.position+0), l                          ; save position to begin of track data
+    ld (iy+smf_track_t.position+1), h                          ; ...
+    add hl, bc                                                 ; save position to end of track data
+    ld (iy+smf_track_t.end+0), l                               ; ...
+    ld (iy+smf_track_t.end+1), h                               ; ...
+    jr nc, 1f                                                  ; check if track is bigger than file
+    or 1                                                       ; ... if yes - reset Z flag
+    ret                                                        ; ... and exit
+1:  ld a, (1<<SMF_TRACK_FLAGS_VALID)|(1<<SMF_TRACK_FLAGS_PLAY) ; set track flags
+    ld (iy+smf_track_t.flags), a                               ; ...
+    xor a                                                      ; set Z flag
+    ret                                                        ;
 
 ; OUT -  F - Z = 1 on success, 0 on error
 ; OUT - AF - garbage
@@ -115,38 +119,42 @@ smf_parse:
     add iy, bc                        ; ...
     dec ixl                           ; ...
     jp nz, 1b                         ; ...
-    xor a                             ; set next track valid flag = 0
-    ld (iy+smf_track_t.valid), a      ; ...
+    xor a                             ; set next track flags = 0
+    ld (iy+smf_track_t.flags), a      ; ...
     call smf_update_tick_duration     ;
     xor a                             ; set Z flag
     ret                               ;
 
 
-; OUT - HL - current position of next track
-; OUT - IY - pointer to next track
+
+; see smf_get_next_track
 smf_get_first_track:
-    ld iy, var_smf_file.tracks                          ;
-    ld hl, (var_smf_file.tracks + smf_track_t.position) ;
-    ret
+    ld iy, var_smf_file.tracks-smf_track_t ;
+    jp smf_get_next_track.entry            ;
 
 ; IN  - HL - current track position
 ; IN  - IY - pointer to current track
+; OUT -  F - Z = 0 on success, 1 if there is no more tracks
 ; OUT - HL - current position of next track
 ; OUT - IY - pointer to next track
 ; OUT - AF - garbage
 ; OUT - BC - garbage
 smf_get_next_track:
-    ld (iy+smf_track_t.position+0), l ;
-    ld (iy+smf_track_t.position+1), h ;
-    ld bc, smf_track_t                ; IY += sizeof(smf_track_t)
-    add iy, bc                        ;
-    ld a, (iy+smf_track_t.valid)      ; if (!track_valid) select 0 track
-    or a                              ; ...
-    jr nz, 1f                         ; ...
-    ld iy, var_smf_file.tracks        ; ...
-1:  ld l, (iy+smf_track_t.position+0) ;
-    ld h, (iy+smf_track_t.position+1) ;
-    ret
+    ld (iy+smf_track_t.position+0), l ; IY->track_position = HL
+    ld (iy+smf_track_t.position+1), h ; ...
+.entry:
+    ld bc, smf_track_t                ;
+.next_track:
+    add iy, bc                        ; IY += sizeof(smf_track_t)
+    ld a, (iy+smf_track_t.flags)      ; if (!track_valid) return Z=1
+    and 1<<SMF_TRACK_FLAGS_VALID      ; ...
+    ret z                             ; ...
+    ld a, (iy+smf_track_t.flags)      ; if (!track_play) check next track
+    and 1<<SMF_TRACK_FLAGS_PLAY       ; ...
+    jr z, .next_track                 ; ...
+    ld l, (iy+smf_track_t.position+0) ; HL = IY->track_position
+    ld h, (iy+smf_track_t.position+1) ; ...
+    ret                               ;
 
 
 ; IN  - HL - track position
@@ -181,13 +189,71 @@ smf_parse_varint:
     ret                       ;
 
 
+; IN  - IY - pointer to smf_track_t
+; OUT - F  - C=1 when delay is going on; C=0 when delay is expired
+; OUT - A  - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
+smf_check_delay:
+    ld hl, (var_int_counter)                   ; HL (elapsed_counter) = (current_counter-acked_counter)
+    ld e, (iy+smf_track_t.wait_duration+0)     ; ... DE = wait_duration[15:0]
+    ld d, (iy+smf_track_t.wait_duration+1)     ; ...
+    ld c, (iy+smf_track_t.int_acked_counter+0) ; ... BC = acked_counter
+    ld b, (iy+smf_track_t.int_acked_counter+1) ; ...
+    xor a                                      ; ... reset C flag
+    sbc hl, bc                                 ; ...
+    sbc hl, de                                 ; if (elapsed_counter < wait_duration) { return; } | if (HL==DE) Z=1,C=0; if (HL<DE) Z=0,C=1; if (HL>DE) Z=0,C=0
+    ret c                                      ; ...
+    ex de, hl                                  ; acked_counter += wait_duration
+    add hl, bc                                 ; ...
+    ld (iy+smf_track_t.int_acked_counter+0), l ; ...
+    ld (iy+smf_track_t.int_acked_counter+1), h ; ...
+.check_32bit_waitduration:
+    or (iy+smf_track_t.wait_duration+2)        ; if (wait_duration[31:16] == 0) return expired
+    or (iy+smf_track_t.wait_duration+3)        ; ... "or" also resets C flag
+    ret z                                      ;
+    xor a                                      ; wait_duration[15:0] = 0x8000
+    ld (iy+smf_track_t.wait_duration+0), a     ; ...
+    ld a, #80                                  ; ...
+    ld (iy+smf_track_t.wait_duration+1), a     ; ...
+    ld a, (iy+smf_track_t.wait_duration+2)     ; wait_duration[31:16]--
+    sub 1                                      ; ... unfortunately "dec" doesnt update C flag
+    ld (iy+smf_track_t.wait_duration+2), a     ; ... so im using "sub"
+    jr nc, 1f                                  ; ...
+    dec (iy+smf_track_t.wait_duration+3)       ; ...
+1:  scf                                        ; set C flag
+    ret                                        ;
+
+
+; IN  - DE   - ticks count
+; IN  - IY   - pointer to smf_track_t
+; OUT - DEHL - wait_duraton
+; OUT - AF   - garbage
+; OUT - BC   - garbage
+smf_set_delay:
+    ld bc, (var_smf_file.tick_duration)        ; DEHL (wait_duration) = ticks_count * tick_duration
+    call mult_de_bc                            ; ...
+    ld a, h                                    ; wait_duration[31:0] = {wait_duration[30:15],0,wait_duration[14:0]}
+    rla                                        ; ... this is required because smf_check_delay
+    rl e                                       ; ... can't easily handle wait_duration[15:0] value >0xff00
+    rl d                                       ; ... (at least this wouldn't be so fast)
+    srl a                                      ; ...
+    ld h, a                                    ; ...
+    ld (iy+smf_track_t.wait_duration+0), l     ; save wait_duration
+    ld (iy+smf_track_t.wait_duration+1), h     ; ...
+    ld (iy+smf_track_t.wait_duration+2), e     ; ...
+    ld (iy+smf_track_t.wait_duration+3), d     ; ...
+    ret                                        ;
+
+
 ; IN  - HL - track position
 ; IN  - IY - pointer to smf_track_t
 ; OUT -  A - status byte
 ; OUT - BC - data len
 ; OUT - HL - next track position
-; OUT - DE - time delta
 ; OUT -  F - garbage
+; OUT - DE - garbage
 ; OUT - IX - garbage
 smf_get_next_status:
     ex hl, de                                 ; check if end of track reached
@@ -196,11 +262,23 @@ smf_get_next_status:
     or a                                      ; clear C flag
     sbc hl, de                                ; if (HL==DE) Z=1,C=0; if (HL<DE) Z=0,C=1; if (HL>DE) Z=0,C=0
     ex hl, de                                 ; ...
-    jr z, .eof                                ; ...
-    jr c, .eof                                ; ...
+    jp z, .eof                                ; ...
+    jp c, .eof                                ; ...
 .parse_time_delta:
     call smf_parse_varint                     ; BC = time delta
-    ld d, b : ld e, c                         ; DE = BC
+    ld a, b                                   ; if (delay == 0) then wait_duration = 0
+    or c                                      ; ...
+    jp nz, .time_delta_non_zero:              ; ...
+    ld (iy+smf_track_t.wait_duration+0), c    ; ... wait_duration = 0
+    ld (iy+smf_track_t.wait_duration+1), b    ; ...
+    ld (iy+smf_track_t.wait_duration+2), c    ; ...
+    ld (iy+smf_track_t.wait_duration+3), b    ; ...
+    jp .parse_status_byte                     ;
+.time_delta_non_zero:
+    push hl                                   ;
+    ld d, b : ld e, c                         ;
+    call smf_set_delay                        ; ... else - calculate and save wait_duration
+    pop hl                                    ;
 .parse_status_byte:
     call file_get_next_byte                   ; A = byte
     bit 7, a                                  ; if this isn't status byte - reuse last one ("Running Status")
@@ -222,7 +300,7 @@ smf_get_next_status:
     ex hl, de                                 ; restore HL (next track position)
     pop de                                    ;
     ld a, #ff                                 ; restore status byte = 0xFF
-    ret
+    ret                                       ;
 .is_sysex:
     cp #f0                                    ; check 0xF0 <= byte < 0xF8
     jr c, .is_note                            ; ...
@@ -247,8 +325,9 @@ smf_get_next_status:
 1:  cp #d0 : jr nz, 1f : dec c : or ixl : ret ; channel after-touch (aka "channel pressure")
 1:  cp #e0 : jr nz, 1f         : or ixl : ret ; pitch wheel change
 .eof:
-1:  xor a                                     ; not valid command, set to zero
-    ret
+1:  res SMF_TRACK_FLAGS_PLAY, (iy+smf_track_t.flags) ; clear play flag
+    xor a                                     ; not valid command, set to zero
+    ret                                       ;
 
 
 ; TODO: SMPTE; negative 'division' field value
@@ -281,35 +360,6 @@ smf_update_tick_duration:                     ; tick_duration = tempo / ppqn / m
 .save:
     ld (var_smf_file.tick_duration), ix       ;
     ret                                       ;
-
-
-; IN  - DE - ticks count
-; IN  - IY - pointer to smf_track_t
-; OUT - F  - C=1 when delay is going on; C=0 when delay is expired
-; OUT - A  - garbage
-; OUT - BC - garbage
-; OUT - DE - garbage
-; OUT - HL - garbage
-smf_delay:
-    ld bc, (var_smf_file.tick_duration)        ; HLDE (wait_duration) = ticks_count * tick_duration
-    call mult_de_bc                            ; ...
-    ex de, hl                                  ; ...
-    ld a, h                                    ; if (wait_duration > 65535) wait_duration = 65535
-    or l                                       ; ...
-    jr z, 1f                                   ; ...
-    ld de, #ffff                               ; ...
-1:  ld hl, (var_int_counter)                   ; HL (elapsed_counter) = (current_counter-acked_counter)
-    ld c, (iy+smf_track_t.int_acked_counter+0) ; ...
-    ld b, (iy+smf_track_t.int_acked_counter+1) ; ...
-    sbc hl, bc                                 ; ...
-    sbc hl, de                                 ; if (elapsed_counter < wait_duration) { return; } | if (HL==DE) Z=1,C=0; if (HL<DE) Z=0,C=1; if (HL>DE) Z=0,C=0
-    ret c                                      ; ...
-    ex de, hl                                  ; acked_counter += wait_duration
-    add hl, bc                                 ; ...
-    ld (iy+smf_track_t.int_acked_counter+0), l ; ...
-    ld (iy+smf_track_t.int_acked_counter+1), h ; ...
-    or a                                       ; reset C flag
-    ret                                        ;
 
 
 ; IN  - BC - data len

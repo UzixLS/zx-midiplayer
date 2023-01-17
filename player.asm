@@ -10,9 +10,9 @@ player_loop:
     jr z, .end                     ; ...
     ld ixl, a                      ; save A
     push af                        ;
-1:  push bc,de,hl                  ;
-    call smf_delay                 ; wait
-    pop hl,de,bc                   ;
+1:  push bc,hl                     ;
+    call smf_check_delay           ; wait
+    pop hl,bc                      ;
     jr c, 1b                       ;
     pop af                         ;
 .status_check:
