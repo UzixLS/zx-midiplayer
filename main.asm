@@ -3,10 +3,12 @@
     OPT --syntax=F
     SLDOPT COMMENT WPMEM, LOGPOINT, ASSERTION
 
-    page 0
     org #4000
-    incbin "title.scr"
+    incbin "play.scr"
+    org #C000,7
+    incbin "files.scr"
 
+    page 0
     org #7777
 begin:
 int_handler:
