@@ -107,6 +107,15 @@ loop:
     include "strings.asm"
     include "variables.asm"
 
+buildversion:
+    ifdef VERSION
+    db VERSION, 0
+    else
+    db 0
+    endif
+builddate:
+    db __DATE__, " ", __TIME__, 0
+end:
     display "Program start: ",main
     display "Program end:   ",$
 
@@ -115,8 +124,5 @@ loop:
 stack_bottom:
     org #BFFF
 stack_top:
-
-
-end:
 
     SAVESNA "main.sna",main
