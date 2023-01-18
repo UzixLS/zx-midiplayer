@@ -10,11 +10,11 @@
 ;     incbin "test0.mid",0
 
 ; for file <32кб
-    org #C000,0
-testmid:
-    incbin "test0.mid",0,#4000
-    org #C000,4
-    incbin "test0.mid",#4000
+;     org #C000,0
+; testmid:
+;     incbin "test0.mid",0,#4000
+;     org #C000,4
+;     incbin "test0.mid",#4000
 
 ; for file <48кб
 ;     org #C000,0
@@ -26,15 +26,15 @@ testmid:
 ;     incbin "test0.mid",#8000
 
 ; for file <64кб
-;     org #C000,0
-; testmid:
-;     incbin "test0.mid",0,#4000
-;     org #C000,4
-;     incbin "test0.mid",#4000,#4000
-;     org #C000,6
-;     incbin "test0.mid",#8000,#4000
-;     org #C000,3
-;     incbin "test0.mid",#C000
+    org #C000,0
+testmid:
+    incbin "test0.mid",0,#4000
+    org #C000,4
+    incbin "test0.mid",#4000,#4000
+    org #C000,6
+    incbin "test0.mid",#8000,#4000
+    org #C000,3
+    incbin "test0.mid",#C000
 
 
     org #4000

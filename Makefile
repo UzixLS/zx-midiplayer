@@ -4,23 +4,24 @@ endif
 
 export PATH:=/cygdrive/c/Hwdev/sjasmplus/:/cygdrive/e/Emulation/ZX Spectrum/Utils/fuse-utils/:/cygdrive/e/Emulation/ZX Spectrum/Emuls/Es.Pectrum/:${PATH}
 
-SJOPTS = --fullpath -DVERSION=\"${VERSION}\"
+SJOPTS = --fullpath --inc=resources/ -DVERSION=\"${VERSION}\"
 
 .PHONY: all clean .FORCE
 .FORCE:
 
-all: main.sna main.tzx
+all: build/main.sna
 
 clean:
-	rm -f *.bin *.mem *.hex *.map *.sna *.z80 *.tzx *.tap *.trd
+	rm -rf build/ .tmp/
 
-%.bin %.sna: %.asm .FORCE
-	sjasmplus --sld=$(basename $<).sld ${SJOPTS} $<
+build/main.sna: src/main.asm .FORCE
+	mkdir -p build
+	sjasmplus --sld=build/main.sld --lst=build/main.lst --outprefix=build/ ${SJOPTS} $<
 
 %.tzx: %.sna
-	snap2tzx $<
+	snap2tzx -o $@ $<
 
-run: main.tzx
+run: build/main.tzx
 	EsPectrum $<
 
 -include Makefile.local

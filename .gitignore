@@ -1,8 +1,11 @@
 /.tmp
 /.vscode
+/build
 ~*
 *~
+*~.*
 *.log
+*.lst
 *.sld
 *.sna
 *.z80
