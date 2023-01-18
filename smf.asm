@@ -39,7 +39,7 @@ SMF_TRACK_FLAGS_PLAY   = 1
 SMF_TRACK_FLAGS_DELAY  = 2
 
 default_tempo = 500000     ; defined by MIDI standard
-max_tracks = 16
+max_tracks = 40
 
 
 ; IN  - HL - position of beginning of file
@@ -159,35 +159,40 @@ smf_get_next_track:
     ret                               ;
 
 
-; IN  - HL - track position
-; OUT - BC - int value (limited to 0x3FFF, should be enought)
-; OUT - HL - next track position
-; OUT - AF - garbage
+; IN  - HL   - track position
+; OUT - DEBC - int value (max 0x0FFFFFFF - 4 bytes)
+; OUT - HL   - next track position
+; OUT - AF   - garbage
 smf_parse_varint:
     call file_get_next_byte   ; A = byte - fvvvvvvV - f - flag, v - value
-    ld b, 0                   ;
+    ld de, 0                  ;
+    ld b, d                   ;
     ld c, a                   ;
     rlca                      ; if (flag == 0) - no more bytes, exit
     ret nc                    ; ...
-    res 7, c                  ; len = ((len & 0x7F) << 7)
+    res 7, c                  ;
+.loop:
+    srl d                     ; before DEBC = 44444444 33333333 22222222 11111111; after DEBC = 43333333 32222222 21111111 10000000
+    ld d, e                   ; ...
+    rr d                      ; ... Cflag = 3
+    ld e, b                   ; ...
+    rr e                      ; ... Cflag = 2
     ld b, c                   ; ...
+    rr b                      ; ... Cflag = 1
     ld c, 0                   ; ...
-    srl b                     ; ... B = 00vvvvvv; Cflag = bit0
-    rr c                      ; ... C = V0000000
+    rr c                      ; ...
     call file_get_next_byte   ; A = byte - fvvvvvvv
-    rlca                      ;
-    jr c, .have_more_bytes    ;
-    srl a                     ; A = 0vvvvvvv
-    or c                      ; A = Vvvvvvvv, len = len | (byte & 0x7F)
-    ld c, a                   ; ...
+    bit 7, a                  ;
+    jr nz, .have_more_bytes   ;
+.last_byte:
+    or c                      ;
+    ld c, a                   ;
     ret                       ;
 .have_more_bytes:
-    ld bc, #3fff              ; set max value 0x3FFF, all other bytes will be skipped
-.loop:
-    call file_get_next_byte   ; loop until all varint bytes skipped
-    rlca                      ; ...
-    jr c, .loop               ; ...
-    ret                       ;
+    res 7, a                  ;
+    or c                      ;
+    ld c, a                   ;
+    jp .loop                  ;
 
 
 ; IN  - IY - pointer to smf_track_t
@@ -229,14 +234,38 @@ smf_check_delay:
     ret                                        ;
 
 
-; IN  - DE   - ticks count
+; IN  - DEBC - ticks count
 ; IN  - IY   - pointer to smf_track_t
 ; OUT - DEHL - wait_duraton
 ; OUT - AF   - garbage
 ; OUT - BC   - garbage
 smf_set_delay:
-    ld bc, (var_smf_file.tick_duration)               ; DEHL (wait_duration) = ticks_count * tick_duration
+    ld a, d                                           ;
+    or e                                              ;
+    jp z, .ticks16bit                                 ;
+.ticks32bit:
+    push bc                                           ;
+    ld bc, (var_smf_file.tick_duration)               ;
+    call mult_de_bc                                   ; DEHL = ticks_count[31:16] * tick_duration
+    ld a, d                                           ; if (DEHL > 0xFFFF) IX = 0xFFFF; else IX = HL
+    or e                                              ; ...
+    jp z, 1f                                          ; ...
+    ld ix, #ffff                                      ; ...
+    jp 2f                                             ;
+1:  ld d, h : ld e, l                                 ; ...
+    ld ixh, d : ld ixl, e                             ; ...
+2:  pop de                                            ;
+    call mult_de_bc                                   ; DEHL = ticks_count[15:0] * tick_duration
+    add ix, de                                        ; DEHL += (ticks_count[31:16] * tick_duration) * 65535
+    ld d, ixh : ld e, ixl                             ; ....
+    jp nc, .save                                      ; if (overflow) - DEHL = 0xffffffff
+    ld de, #ffff                                      ; ....
+    ld hl, #ffff                                      ; ....
+    jp .save                                          ;
+.ticks16bit:
+    ld de, (var_smf_file.tick_duration)               ; DEHL (wait_duration) = ticks_count * tick_duration
     call mult_de_bc                                   ; ...
+.save:
     ld a, h                                           ; wait_duration[31:0] = {wait_duration[30:15],0,wait_duration[14:0]}
     rla                                               ; ... this is required because smf_check_delay
     rl e                                              ; ... can't easily handle wait_duration[15:0] value >0xff00
@@ -253,23 +282,24 @@ smf_set_delay:
 
 ; IN  - HL - track position
 ; IN  - IY - pointer to smf_track_t
-; OUT - BC - int value (limited to 0x3FFF, should be enought)
 ; OUT - HL - next track position
 ; OUT - AF - garbage
+; OUT - BC - garbage
 ; OUT - DE - garbage
 smf_get_next_delay:
-    call smf_parse_varint                     ; BC = time delta
+    call smf_parse_varint                     ; DEBC = time delta
     ld a, b                                   ; if (delay == 0) then wait_duration = 0
     or c                                      ; ...
+    or d                                      ; ...
+    or e                                      ; ...
     jp nz, .time_delta_non_zero               ; ...
     ld (iy+smf_track_t.wait_duration+0), c    ; ... wait_duration = 0
     ld (iy+smf_track_t.wait_duration+1), b    ; ...
-    ld (iy+smf_track_t.wait_duration+2), c    ; ...
-    ld (iy+smf_track_t.wait_duration+3), b    ; ...
+    ld (iy+smf_track_t.wait_duration+2), e    ; ...
+    ld (iy+smf_track_t.wait_duration+3), d    ; ...
     ret                                       ;
 .time_delta_non_zero:
     push hl                                   ;
-    ld d, b : ld e, c                         ;
     call smf_set_delay                        ; ... else - calculate and save wait_duration
     pop hl                                    ;
     ret                                       ;
@@ -293,17 +323,15 @@ smf_get_next_status:
 .is_meta_event:
     cp #ff                                    ; A == 0xFF?
     jr nz, .is_sysex                          ; ... no
-    push de                                   ;
     push hl                                   ; save HL (next track position)
     inc hl                                    ; "FF cc ll... dd..." - cc - command, ll - length, dd - data
-    call smf_parse_varint                     ; BC = ll - length of dd, HL = next track position (pointing to dd)
-    pop de                                    ; DE = prev track position
+    call smf_parse_varint                     ; DEBC = ll - length of dd, HL = next track position (pointing to dd)
+    pop de                                    ; DE = prev track position ;XXX assume length is always <= 0xffff
     or a                                      ; reset C flag
     sbc hl, de                                ; get length of cc and ll (HL = HL - DE - C flag)
     add hl, bc                                ; sum length of cc/ll and dd
     ld b, h : ld c, l                         ; BC = total data len
     ex hl, de                                 ; restore HL (next track position)
-    pop de                                    ;
     ld a, #ff                                 ; restore status byte = 0xFF
     ret                                       ;
 .is_sysex:
@@ -341,6 +369,7 @@ smf_get_next_status:
 ; OUT -  A - status byte (only when F/C=0)
 ; OUT - BC - data len (only when F/C=0)
 ; OUT - HL - next track position
+; OUT - DE - garbage
 smf_process_track:
     bit SMF_TRACK_FLAGS_DELAY, (iy+smf_track_t.flags) ;
     jr z, .check_end_of_track                         ;

@@ -2,8 +2,9 @@
 player_loop:
     ld a, #ff                      ; issue reset status
     di : call uart_putc : ei       ; ...
-    halt : ei                      ; wait 20ms just for safety
+    halt                           ; wait 20ms just for safety
 .loop:
+    halt
     call smf_get_first_track       ;
     jr z, .end                     ;
 .process_current_track:
