@@ -1,6 +1,7 @@
 CPU_FREQ_3_5_MHZ  = 0
 CPU_FREQ_3_54_MHZ = 1
 CPU_FREQ_7_MHZ    = 2
+CPU_FREQ_14_MHZ   = 3
 var_cpu_freq BYTE CPU_FREQ_3_5_MHZ
 
 INT_50_HZ   = 0

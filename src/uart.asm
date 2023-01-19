@@ -9,6 +9,8 @@ uart_init:
     ld a, #fc                        ;
     out (c), a                       ; Enable port A output.
     ld a, (var_cpu_freq)             ; if (cpu frequency != 3.5MHz) then patch code for it
+    cp CPU_FREQ_14_MHZ               ;
+    jp z, uart_patch_for_cpu_14mhz   ;
     cp CPU_FREQ_7_MHZ                ;
     jp z, uart_patch_for_cpu_7mhz    ;
     cp CPU_FREQ_3_54_MHZ             ;
@@ -16,25 +18,30 @@ uart_init:
     ret                              ; ...
 
 uart_patch_for_cpu_3_54mhz:
-    xor a                       ; 0x00 = nop (4 T-states). Next byte at destination is 0x00 too.
-    ld (uart_putc.A), a         ; ... so we're replacing "ld a,0" (7) with "nop : nop" (8)
-    ld (uart_putc.B), a         ; ...
-    ret                         ;
-
+    xor a                            ; 0x00 = nop (4 T-states). Next byte at destination is 0x00 too.
+    ld (uart_putc.A), a              ; ... so we're replacing "ld a,0" (7) with "nop : nop" (8)
+    ld (uart_putc.B), a              ; ...
+    ret                              ;
 uart_patch_for_cpu_7mhz
-    ld a, 12                    ; ld e, 12
-    ld (uart_putc.E+1), a       ;
-    xor a                       ; jr $+2
-    ld (uart_putc.C+1), a       ; ...
-    ld (uart_putc.D+1), a       ; ...
-    ret                         ;
+    ld a, 12                         ; ld e, 12
+    ld (uart_putc.E+1), a            ;
+    ld a, 11                         ; ld a, 11
+    ld (uart_putc.C+1), a            ; ...
+    ld a, 9                          ; ld a, 9
+    ld (uart_putc.D+1), a            ; ...
+    ret                              ;
+uart_patch_for_cpu_14mhz
+    ld a, 24                         ; ld e, 24
+    ld (uart_putc.E+1), a            ;
+    ld a, 27                         ; ld a, 27
+    ld (uart_putc.C+1), a            ; ...
+    ld a, 25                         ; ld a, 25
+    ld (uart_putc.D+1), a            ; ...
+    ret                              ;
 
 
-; Send Byte to MIDI Device
-; ------------------------
-; This routine sends a byte to the MIDI port. MIDI devices communicate at 31250 baud,
-; although this routine actually generates a baud rate of 31388, which is within the 1%
-; tolerance supported by MIDI devices.
+; Send byte to MIDI device
+; Baudrate 31250 for 3.5MHz CPU or 31388 for 3.5469MHz CPU
 ; IN  -   A - byte to send
 ; OUT -  AF - garbage
 ; OUT -  BC - garbage
@@ -51,14 +58,10 @@ uart_putc:
     out (c), a         ; Send out the START bit.
 .delay_after_start_bit:
 .A: ld a, 0            ; (7) Introduce delays such that the next bit is output 112 T-states from now. Self modifying code! See uart_patch_for_cpu_3_54mhz
-    ld a, 0            ; (7)
-    ld a, (ix)         ; (19)
-    bit 0, (ix)        ; (20)
-.C: jr .send_bits      ; (12) Self modifying code! See uart_patch_for_cpu_7mhz
-    ld a, 0            ; (7) Additional delay for 7MHz CPU. 224 T-states total
-    ld a, 7            ; (7)
-1:  dec a              ; (4*7)
-    jp nz, 1b          ; (10*7)
+    ld a, r            ; (9)
+.C: ld a, 3            ; (7) Self modifying code! See uart_patch_for_cpu_*. Patched for 112/224/448 T-states total
+1:  dec a              ; (4*3) or (4*11) or (4*27)
+    jp nz, 1b          ; (10*3) or (10*11) or (10*27)
 
 .send_bits:
     ld a, e            ; (4) Retrieve the byte to send.
@@ -76,16 +79,14 @@ uart_putc:
     out (c), a         ; (11)
     jr .delay_next_bit ; (12) Jump forward to process the next bit.
 .delay_next_bit:
-    nop                ; (4) Introduce delays such that the next data bit is output 112 T-states from now.
-.B: ld a, 0            ; (7) Self modifying code! See uart_patch_for_cpu_3_54mhz
-    ld a, 0            ; (7)
-    ld a, 0            ; (7)
-    ld a, 0            ; (7)
-.D: jr .check_for_loop ; (12) Self modifying code! See uart_patch_for_cpu_7mhz
-    ld a, 0            ; (7) Additional delay for 7MHz CPU. 224 T-states total
-    ld a, 7            ; (7)
-1:  dec a              ; (4*7)
-    jp nz, 1b          ; (10*7)
+.B: ld a, 0            ; (7) Introduce delays such that the next data bit is output 112 T-states from now. Self modifying code! See uart_patch_for_cpu_3_54mhz
+    nop                ; (4)
+    nop                ; (4)
+    nop                ; (4)
+    nop                ; (4)
+.D: ld a, 1            ; (7) Self modifying code! See uart_patch_for_cpu_*. Patched for 112/224/448 T-states total
+1:  dec a              ; (4*1) or (4*9) or (4*25)
+    jp nz, 1b          ; (10*1) or (10*9) or (4*25)
 .check_for_loop:
     ld a, e            ; (4) Retrieve the remaining bits to send.
     dec d              ; (4) Decrement the bit counter.
@@ -101,7 +102,7 @@ uart_putc:
     ld a, #fe          ; (7) Set RS232 'RXD' transmit line to 1. (Keep KEYPAD 'CTS' output line low to prevent the keypad resetting)
     out (c), a         ; (11) Send out the STOP bit.
 .delay_after_stop_bit:
-.E: ld e, 6            ; (7) Delay for 101 T-states (28.5us). Self modifying code! See uart_patch_for_cpu_7mhz
+.E: ld e, 6            ; (7) Delay for 101 T-states (28.5us). Self modifying code! See uart_patch_for_cpu_*
 1:  dec e              ; (4)
     jr nz, 1b          ; (12/7)
 
