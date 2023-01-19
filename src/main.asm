@@ -51,8 +51,8 @@ int_handler:
     inc a
     ld (var_int_counter+1), a
     pop af
-    ei
-    ret
+.A: ei                        ; (1 byte) self modifying code! see device_detect_cpu_int
+    ret                       ; (1 byte) ...
 
     org #8000
 int_im2_vector_table:
@@ -61,16 +61,18 @@ int_im2_vector_table:
                 ; so we just play safe and use symmetric int handler address and vector table with one extra byte
 
 main:
-    di
-    ld a, #80      ; set IM2 interrupt table address (#8000-#8100)
-    ld i, a        ; ...
-    im 2           ; ...
-    ld a, #10      ; page BASIC48
-    ld bc, #7ffd   ; ...
-    out (c), a     ; ...
-    ld a, #01      ; set blue border
-    out (#fe), a   ; ...
-    call uart_init ;
+    di               ;
+    ld sp, stack_top ;
+    ld a, #80        ; set IM2 interrupt table address (#8000-#8100)
+    ld i, a          ; ...
+    im 2             ; ...
+    ld a, #10        ; page BASIC48
+    ld bc, #7ffd     ; ...
+    out (c), a       ; ...
+    ld a, #01        ; set blue border
+    out (#fe), a     ; ...
+    call device_detect_cpu_int ;
+    call uart_init   ;
 
     ; call #3d21    ; init
     ; ld a, 0       ; drive = a
@@ -104,6 +106,7 @@ loop:
     include "smf.asm"
     include "player.asm"
     include "draw.asm"
+    include "device.asm"
     include "strings.asm"
     include "variables.asm"
 
