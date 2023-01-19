@@ -196,34 +196,45 @@ pixel_address_up:
     ret
 
 
-; Print a BCD value
-; IN  - IX - pointer to BCD value
-; IN  - HL - screen address to print character at
-; OUT -
-print_bcd_8     ld a, (ix) : inc ix: call print_bcd
-print_bcd_6     ld a, (ix) : inc ix: call print_bcd
-print_bcd_4     ld a, (ix) : inc ix: call print_bcd
-print_bcd_2     ld a, (ix) : inc ix
-    ; fall through to print_bcd ...
+; Print a HEX/BCD value
+; IN  - IX - pointer to HEX/BCD value
+print_hex_8     ld a, (ix) : inc ix: call print_hex
+print_hex_6     ld a, (ix) : inc ix: call print_hex
+print_hex_4     ld a, (ix) : inc ix: call print_hex
+print_hex_2     ld a, (ix) : inc ix
+    ; fall through to print_hex ...
 
-; Print a single BCD value
+; Print a single HEX/BCD value
 ; IN  -  A - character to print
 ; IN  - HL - screen address to print character at
+; OUT - HL - next screen address
 ; OUT - AF - garbage
-; OUT -  L - garbage
-print_bcd:
+; OUT - BC - garbage
+; OUT - DE - garbage
+print_hex:
     push af             ; store the value
     and 0xf0            ; get the top nibble
     rra                 ; shift into bottom nibble
     rra
     rra
     rra
-    add a, '0'          ; add to ASCII '0'
+    cp 10               ; if a >= 10 - handle as HEX
+    jp c, 1f            ; ...
+    add a, 'A'-10       ; add to ASCII 'A'
     call print_char     ; print the character
-    inc l               ; move right one space
+    jp 2f
+1:  add a, '0'          ; add to ASCII '0'
+    call print_char     ; print the character
+2:  inc l               ; move right one space
     pop af
     and 0x0f            ; get the bottom nibble
-    add a, '0'          ; add to ASCII '0'
+    cp 10               ; if a >= 10 - handle as HEX
+    jp c, 1f            ; ...
+    add a, 'A'-10       ; add to ASCII 'A'
+    call print_char     ; print the character
+    inc l               ; move right one space
+    ret
+1:  add a, '0'          ; add to ASCII '0'
     call print_char     ; print
     inc l               ; move right one space
     ret
