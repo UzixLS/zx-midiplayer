@@ -3,48 +3,10 @@
     OPT --syntax=F
     SLDOPT COMMENT WPMEM, LOGPOINT, ASSERTION
 
-
-; for file <16кб
-;     org #C000,0
-; testmid:
-;     incbin "test0.mid",0
-
-; for file <32кб
-;     org #C000,0
-; testmid:
-;     incbin "test0.mid",0,#4000
-;     org #C000,4
-;     incbin "test0.mid",#4000
-
-; for file <48кб
-;     org #C000,0
-; testmid:
-;     incbin "test0.mid",0,#4000
-;     org #C000,4
-;     incbin "test0.mid",#4000,#4000
-;     org #C000,6
-;     incbin "test0.mid",#8000
-
-; for file <64кб
-    org #C000,0
-testmid:
-    incbin "test0.mid",0,#4000
-    org #C000,4
-    incbin "test0.mid",#4000,#4000
-    org #C000,6
-    incbin "test0.mid",#8000,#4000
-    org #C000,3
-    incbin "test0.mid",#C000
-
-
-    org #4000
-    incbin "play.scr"
-    org #C000,7
-    incbin "files.scr"
-
     page 0
-    org #7777
+    org #7f74
 begin:
+    db "Code begin",0
 int_handler:
     push af
     ld a, (var_int_counter+1)
@@ -54,9 +16,11 @@ int_handler:
 .A: ei                        ; (1 byte) self modifying code! see device_detect_cpu_int
     ret                       ; (1 byte) ...
 
+    assert $ < 0x8000
     org #8000
 int_im2_vector_table:
-    .257 db #77 ; by Z80 user manual int vector is I * 256 + (D & 0xFE)
+    assert int_handler == 0x7f7f
+    .257 db #7f ; by Z80 user manual int vector is I * 256 + (D & 0xFE)
                 ; but by other references and by T80/A-Z80 implementation int vector is I * 256 + D
                 ; so we just play safe and use symmetric int handler address and vector table with one extra byte
 
@@ -118,6 +82,7 @@ buildversion:
     endif
 builddate:
     db __DATE__, " ", __TIME__, 0
+    db "Code end",0
 end:
     display "Program start: ",main
     display "Program end:   ",$
@@ -128,4 +93,69 @@ stack_bottom:
     org #BFFF
 stack_top:
 
-    SAVESNA "main.sna",main
+
+
+; === SNA file ===
+    org #4000   : incbin "play.scr"
+    org #C000,7 : incbin "files.scr"
+
+    org #C000,0
+testmid:
+    ; incbin "test0.mid",0 ; <= 16 Kb
+    ; incbin "test0.mid",0,#4000 : org #C000,4 : incbin "test0.mid",#4000 ; <= 32 Kb
+    ; incbin "test0.mid",0,#4000 : org #C000,4 : incbin "test0.mid",#4000,#4000 : org #C000,6 : incbin "test0.mid",#8000 ; <= 48 Kb
+    incbin "test0.mid",0,#4000 : org #C000,4 : incbin "test0.mid",#4000,#4000 : org #C000,6 : incbin "test0.mid",#8000,#4000 : org #C000,3 : incbin "test0.mid",#C000 ; <= 64 Kb
+
+    page 0 : savesna "main.sna", main
+
+
+; === TRD file ===
+    org #5d3b
+boot_b:
+    dw #0100, .end-$-4, #30fd,#000e,#b300,#005f,#f93a,#30c0,#000e,#5300,#005d,#ea3a
+.enter:
+    di
+
+    ld hl, #4000                      ;
+    ld b, 6912/256                    ;
+    call .sub_load                    ;
+
+    ld a, #17                         ;
+    ld bc, #7ffd                      ;
+    out (c), a                        ;
+    ld hl, #c000                      ;
+    ld b, 6912/256                    ;
+    call .sub_load                    ;
+
+    ld hl, begin                      ;
+    ld b, (end-begin)/256+1           ;
+    call .sub_load                    ;
+
+    ld a, #10                         ;
+    ld bc, #7ffd                      ;
+    out (c), a                        ;
+    ld hl, #c000                      ;
+    ld b, test1_mid_len/256+1         ; TODO correct len
+    call .sub_load                    ;
+
+    jp main                           ;
+
+; IN - HL - destination address
+; IN - B  - sectors count
+.sub_load:
+    ld de, (#5cf4)          ;
+    ld c, #05               ;
+    jp #3d13                ;
+
+    db #0d
+.end:
+
+    emptytrd "main.trd", "ZXMIDI"
+    page 0 : savetrd "main.trd", "boot.B", boot_b, boot_b.end-boot_b
+    page 0 : savetrd "main.trd", &"boot.B", #4000, 6912
+    page 7 : savetrd "main.trd", &"boot.B", #C000, 6912
+    page 0 : savetrd "main.trd", &"boot.B", begin, end-begin
+
+    org 0 : incbin "test1.mid"
+test1_mid_len = $
+    savetrd "main.trd", &"boot.B", 0, test1_mid_len
