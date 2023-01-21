@@ -3,5 +3,6 @@
 @timeout 5
 
 @PATH=C:\Hwdev\sjasmplus\;%PATH%
-sjasmplus --outprefix=build/ --inc=resources/ src/main.asm
+sjasmplus --outprefix=build/ --exp=build/main.exp src/main.asm
+sjasmplus --outprefix=build/ src/build.asm
 @pause

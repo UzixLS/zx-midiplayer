@@ -1,6 +1,6 @@
     ASSERT __SJASMPLUS__ >= 0x011401 ; SjASMPlus 1.20.1
     DEVICE ZXSPECTRUM128,stack_top
-    OPT --syntax=F
+    OPT --syntax=abf
     SLDOPT COMMENT WPMEM, LOGPOINT, ASSERTION
 
     page 0
@@ -52,7 +52,7 @@ main:
     ld ix, string_title
     call print_string0
 
-    ld ix, testmid
+    ld ix, #c000
     call smf_parse
     jr nz, loop
     call player_loop
@@ -84,8 +84,7 @@ builddate:
     db __DATE__, " ", __TIME__, 0
     db "Code end",0
 end:
-    display "Program start: ",main
-    display "Program end:   ",$
+    display "Code entrypoint=", main, " start=", begin, " end=",end, " len=", /d, end-begin
 
     assert $ < stack_bottom
     org #BF00
@@ -94,68 +93,7 @@ stack_bottom:
 stack_top:
 
 
-
-; === SNA file ===
-    org #4000   : incbin "play.scr"
-    org #C000,7 : incbin "files.scr"
-
-    org #C000,0
-testmid:
-    ; incbin "test0.mid",0 ; <= 16 Kb
-    ; incbin "test0.mid",0,#4000 : org #C000,4 : incbin "test0.mid",#4000 ; <= 32 Kb
-    ; incbin "test0.mid",0,#4000 : org #C000,4 : incbin "test0.mid",#4000,#4000 : org #C000,6 : incbin "test0.mid",#8000 ; <= 48 Kb
-    incbin "test0.mid",0,#4000 : org #C000,4 : incbin "test0.mid",#4000,#4000 : org #C000,6 : incbin "test0.mid",#8000,#4000 : org #C000,3 : incbin "test0.mid",#C000 ; <= 64 Kb
-
-    page 0 : savesna "main.sna", main
-
-
-; === TRD file ===
-    org #5d3b
-boot_b:
-    dw #0100, .end-$-4, #30fd,#000e,#b300,#005f,#f93a,#30c0,#000e,#5300,#005d,#ea3a
-.enter:
-    di
-
-    ld hl, #4000                      ;
-    ld b, 6912/256                    ;
-    call .sub_load                    ;
-
-    ld a, #17                         ;
-    ld bc, #7ffd                      ;
-    out (c), a                        ;
-    ld hl, #c000                      ;
-    ld b, 6912/256                    ;
-    call .sub_load                    ;
-
-    ld hl, begin                      ;
-    ld b, (end-begin)/256+1           ;
-    call .sub_load                    ;
-
-    ld a, #10                         ;
-    ld bc, #7ffd                      ;
-    out (c), a                        ;
-    ld hl, #c000                      ;
-    ld b, test1_mid_len/256+1         ; TODO correct len
-    call .sub_load                    ;
-
-    jp main                           ;
-
-; IN - HL - destination address
-; IN - B  - sectors count
-.sub_load:
-    ld de, (#5cf4)          ;
-    ld c, #05               ;
-    jp #3d13                ;
-
-    db #0d
-.end:
-
-    emptytrd "main.trd", "ZXMIDI"
-    page 0 : savetrd "main.trd", "boot.B", boot_b, boot_b.end-boot_b
-    page 0 : savetrd "main.trd", &"boot.B", #4000, 6912
-    page 7 : savetrd "main.trd", &"boot.B", #C000, 6912
-    page 0 : savetrd "main.trd", &"boot.B", begin, end-begin
-
-    org 0 : incbin "test1.mid"
-test1_mid_len = $
-    savetrd "main.trd", &"boot.B", 0, test1_mid_len
+    export begin
+    export end
+    export main
+    savebin "main.bin", begin, end-begin
