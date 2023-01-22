@@ -28,20 +28,20 @@ device_detect_cpu_int:
 .debug:
     ; push de
     ; push bc
-    ; ld hl, #0201
+    ; ld hl, LAYOUT_DEBUG
     ; call get_char_address
     ; ld a, b
-    ; call print_bcd
+    ; call print_hex
     ; pop bc
     ; ld a, c
-    ; call print_bcd
+    ; call print_hex
     ; pop de
     ; push de
     ; ld a, d
-    ; call print_bcd
+    ; call print_hex
     ; pop de
     ; ld a, e
-    ; call print_bcd
+    ; call print_hex
     ; jp device_detect_cpu_int
     ret
 

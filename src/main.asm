@@ -36,7 +36,8 @@ main:
     ld a, #01        ; set blue border
     out (#fe), a     ; ...
     call device_detect_cpu_int ;
-    call uart_init   ;
+    call uart_init             ;
+    call input_detect_kempston ;
 
     ; call #3d21    ; init
     ; ld a, 0       ; drive = a
@@ -54,16 +55,18 @@ main:
 
     ld ix, #c000
     call smf_parse
-    jr nz, loop
+    jp nz, loop
     call player_loop
-loop:
     ld a, #02      ; set red border
     out (#fe), a   ; ...
+loop:
     ei
     halt
-    jr loop
+    call input_process
+    jp loop
 
-    include "layout.asm"
+
+    include "input.asm"
     include "file.asm"
     include "uart.asm"
     include "math.asm"
@@ -71,7 +74,11 @@ loop:
     include "player.asm"
     include "draw.asm"
     include "device.asm"
+
+    include "config.asm"
+    include "layout.asm"
     include "strings.asm"
+
     include "variables.asm"
 
 buildversion:
