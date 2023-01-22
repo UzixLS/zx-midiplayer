@@ -1,7 +1,7 @@
     ASSERT __SJASMPLUS__ >= 0x011401 ; SjASMPlus 1.20.1
-    DEVICE ZXSPECTRUM128,stack_top
     OPT --syntax=abf
     SLDOPT COMMENT WPMEM, LOGPOINT, ASSERTION
+    DEVICE ZXSPECTRUM128,stack_top
 
     page 0
     org #7f74
@@ -103,4 +103,5 @@ stack_top:
     export begin
     export end
     export main
+    export stack_top
     savebin "main.bin", begin, end-begin

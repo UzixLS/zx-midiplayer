@@ -1,6 +1,6 @@
     ASSERT __SJASMPLUS__ >= 0x011401 ; SjASMPlus 1.20.1
-    DEVICE ZXSPECTRUM128
     OPT --syntax=abf
+    DEVICE ZXSPECTRUM128,stack_top
 
     include "build/main.exp"
     includelua "lua/incbin_pages.lua"
