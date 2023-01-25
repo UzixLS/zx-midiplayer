@@ -49,6 +49,8 @@ main:
     ; ld c, 7       ; function = list files
     ; call #3d13
 
+    ; call menu_debug_loop
+
     ld hl, LAYOUT_TITLE_STR
     ld ix, string_title
     call print_string0
@@ -70,6 +72,7 @@ loop:
     include "file.asm"
     include "uart.asm"
     include "math.asm"
+    include "menu.asm"
     include "smf.asm"
     include "player.asm"
     include "draw.asm"

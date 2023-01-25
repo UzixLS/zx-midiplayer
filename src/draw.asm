@@ -1,28 +1,115 @@
 ; https://github.com/breakintoprogram/lib-spectrum/blob/master/lib/output.z80
 
 
+; IN  - A  = #40 - use screen at #4000, A = #C0 - use screen at #C000
+; OUT - AF - garbage
+screen_select:
+    ld (get_char_address.A+1), a  ;
+    ld (clear_screen.A+2), a      ;
+    ld (clear_screen.B+2), a      ;
+    ld (get_pixel_address.A+1), a ;
+    add #18                       ;
+    ld (get_attr_address.A+1), a  ;
+    ret                           ;
+
+
 ; Simple clear-screen routine
 ; IN  -  A - colour to clear attribute block of memory with
 ; OUT - BC - garbage
 ; OUT - DE - garbage
 ; OUT - HL - garbage
 clear_screen:
-    ld hl, 16384        ; start address of screen bitmap
-    ld de, 16385        ; address + 1
-    ld bc, 6144         ; length of bitmap memory to clear
-    ld (hl), 0          ; set the first byte to 0
-    ldir                ; copy this byte to the second, and so on
-    ld bc, 767          ; length of attribute memory, less one to clear
-    ld (hl), a          ; set the first byte to A
-    ldir                ; copy this byte to the second, and so on
-    ret
+.A: ld hl, 0x4000       ; self modifying code! see screen_select
+.B: ld de, 0x4001       ; self modifying code! see screen_select
+    ld bc, 6144         ;
+    ld (hl), 0          ;
+    ldir                ;
+    ld bc, 767          ;
+    ld (hl), a          ;
+    ldir                ;
+    ret                 ;
+
+
+; Clear screen pixel area routine
+; IN  - B   - lines count [0..23]
+; IN  - C   - width columns [1..31]
+; IN  - H   - Y [0..23]
+; IN  - L   - X [0..31]
+; OUT - AF  - garbage
+; OUT - BC  - garbage
+; OUT - DE  - garbage
+; OUT - HL  - garbage
+clear_screen_area_at:
+    rlc b : rlc b : rlc b
+    rlc h : rlc h : rlc h
+    rlc l : rlc l : rlc l
+    ; fall through to clear_screen_area ...
+
+; Clear screen pixel area routine
+; IN  - B   - lines count [0..191]
+; IN  - C   - width columns [1..31]
+; IN  - H   - Y [0..191]
+; IN  - L   - X [0..255]
+; OUT - AF  - garbage
+; OUT - BC  - garbage
+; OUT - DE  - garbage
+; OUT - HL  - garbage
+clear_screen_area:
+    ld a, c                 ;
+    dec a                   ;
+    jr z, .onebytewidth     ; we cant use ldir when width=1
+    ld (.A+1), a            ;
+    push bc                 ;
+    ld b, h : ld c, l       ; HL = screen address
+    call get_pixel_address  ; ...
+    jp .first_line          ;
+.next_line:
+    push bc                 ;
+    call pixel_address_down ;
+.first_line:
+    push hl                 ;
+.A: ld bc, 0                ; clear line. self modifying code! see above
+    ld d, h : ld e, l       ; ...
+    inc de                  ; ...
+    ld (hl), b              ; ...
+    ldir                    ; ... do { *(DE++) = *(HL++) } while(--BC) // columns--
+    pop hl                  ;
+    pop bc                  ;
+    djnz .next_line         ;
+    ret                     ;
+.onebytewidth:
+    push bc                 ;
+    ld b, h : ld c, l       ; HL = screen address
+    call get_pixel_address  ; ...
+    pop bc                  ;
+    dec c                   ;
+.next_line_1:
+    ld (hl), c              ;
+    call pixel_address_down ;
+    djnz .next_line_1       ;
+    ret                     ;
 
 
 ; Fill a box of the screen with a solid colour
 ; IN  -  A - the colour
+; IN  -  H - Y character position [0..23]
+; IN  -  L - X character position [0..31]
+; IN  -  B - width
+; IN  -  C - height
+; OUT -  F - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
+fill_attr_at:
+    push af
+    call get_attr_address
+    pop af
+    ; fall through to fill_attr ...
+
+; Fill a box of the screen with a solid colour
+; IN  -  A - the colour
 ; IN  - HL - address in the attribute map
-; IN  -  C - width
-; IN  -  B - height
+; IN  -  B - width
+; IN  -  C - height
 ; OUT -  F - garbage
 ; OUT - DE - garbage
 ; OUT - HL - garbage
@@ -34,62 +121,134 @@ fill_attr:
 .loop_columns:
     ld (hl), a
     inc l
-    dec c
-    jr nz, .loop_columns
+    djnz .loop_columns
     pop bc
     pop hl
     add hl, de
-    djnz .loop_rows
+    dec c
+    jp nz, .loop_rows
     ret
 
 
-; Print NULL(0)-terminated string
-; IN  - IX - pointer to string
-; IN  -  H - Y character position [0..23]
-; IN  -  L - X character position [0..31]
-; OUT -  A - 0
-; OUT - IX - pointer to NULL byte
-; OUT -  F - garbage
+; Vertical scroll screen area
+; IN  -  B - lines count [0..23]
+; IN  -  C - width columns [2..31]
+; IN  -  H - source Y [0..23]
+; IN  -  L - X [0..31]
+; IN  -  D - dest Y [0..23]
+; OUT - AF - garbage
+; OUT - BC - garbage
 ; OUT - DE - garbage
 ; OUT - HL - garbage
-print_string0:
-    call get_char_address ; HL = screen address
-.loop:
-    ld a, (ix)            ; fetch the character to print
-    or a                  ; exit if NULL character detected
-    ret z                 ; ...
-    call print_char       ;
-    inc l                 ; go to the next screen address
-    inc ix                ; increase IX to the next character
-    jr .loop              ; loop back to print next character
-    ret
+; OUT - IX - garbage
+; OUT - IY - garbage
+vertical_scroll_at:
+    rlc b : rlc b : rlc b
+    rlc h : rlc h : rlc h
+    rlc l : rlc l : rlc l
+    rlc d : rlc d : rlc d
+    ; fall through to vertical_scroll ...
 
-; Print string
-; IN  - IX - pointer to string
-; IN  -  H - Y character position [0..23]
-; IN  -  L - X character position [0..31]
-; IN  -  B - string length
-; OUT -  A - 0
-; OUT - IX - pointer to NULL byte
-; OUT -  F - garbage
+
+; Vertical scroll screen area
+; IN  -  B - lines count [0..191]
+; IN  -  C - width columns [2..31]
+; IN  -  H - source Y [0..191]
+; IN  -  L - X [0..255]
+; IN  -  D - dest Y [0..191]
+; OUT - AF - garbage
+; OUT - BC - garbage
 ; OUT - DE - garbage
 ; OUT - HL - garbage
-print_stringl:
-    call get_char_address ; HL = screen address
-.loop:
-    ld a, (ix)            ; fetch the character to print
-    push bc               ;
-    call print_char       ;
-    pop bc                ;
-    inc l                 ; go to the next screen address
-    inc ix                ; increase IX to the next character
-    djnz .loop:           ; loop back to print next character
-    ret
+; OUT - IX - garbage
+; OUT - IY - garbage
+vertical_scroll:
+    push hl : pop ix       ; IXH=Y_source IXL=X
+    ld iyh, d : ld iyl, b  ; IYH=Y_dest   IYL=lines
+    ld a, c                ; set width for ldir
+    ld (.A+1), a           ; ...
+    dec a                  ; ...
+    ld (.B+1), a           ; ...
+    ld a, h                ; if src == dst - exit
+    sub d                  ; ... A = src-dst
+    ret z                  ; ...
+    jp c, .down            ;
+.up:
+    ld (.E+1), a           ; set how much lines to clear
+    ld a, #24              ; inc ixh/iyh opcode
+    ld (.C+1), a           ; ...
+    ld (.D+1), a           ; ...
+    jp .first_line         ;
+.down:
+    neg                    ; set how much lines to clear
+    ld (.E+1), a           ; ...
+    dec b                  ;
+    ld a, h                ; source_y += (lines-1)
+    add b                  ; ...
+    ld ixh, a              ; ...
+    ld a, d                ; dest_y += (lines-1)
+    add b                  ; ...
+    ld iyh, a              ; ...
+    ld a, #25              ; dec ixh/iyh opcode
+    ld (.C+1), a           ; ...
+    ld (.D+1), a           ; ...
+    jp .first_line         ;
+.next_line:
+.C: inc ixh                ; source_y++ // self modifying code! see above
+.D: inc iyh                ; dest_y++   // self modifying code! see above
+.first_line:
+    ld b, iyh : ld c, ixl  ; DE = dest address
+    call get_pixel_address ; ...
+    ex de, hl              ; ...
+    ld b, ixh : ld c, ixl  ; HL = source address
+    call get_pixel_address ; ...
+    push hl                ;
+.A: ld bc, 0               ; copy line. self modifying code! see above
+    ldir                   ; ... do { *(DE++) = *(HL++) } while(--BC) // columns--
+    pop hl                 ;
+.E: ld a, 0                ; check if we should clear line. self modifying code! see above
+    cp iyl                 ; ...
+    jr nc, .clear_line     ; iyl <= a
+    dec iyl                ;
+    jp nz, .next_line      ; lines--
+.clear_line:
+    ld d, h : ld e, l      ;
+    inc de                 ;
+.B: ld bc, 0               ; self modifying code! see above
+    ld (hl), b             ;
+    ldir                   ;
+    dec iyl                ;
+    jp nz, .next_line      ; lines--
+    ret                    ;
+
 
 ; Get screen address
-; IN  -  H - Y character position
-; IN  -  L - X character position
-; OUT - HL - address
+; IN  -  H - Y character position [0..23]
+; IN  -  L - X character position [0..31]
+; OUT - HL - address (attribute area)
+; OUT - AF - garbage
+get_attr_address: ; IN:000yyyyy 000xxxxx OUT: 010110yy yyyxxxxx
+    ld a, h
+    and %00000111
+    rrca
+    rrca
+    rrca
+    or l
+    ld l, a
+    ld a, h
+    and %00011000
+    rrca
+    rrca
+    rrca
+.A: or #58   ; self modifying code! see screen_select
+    ld h, a
+    ret
+
+
+; Get screen address
+; IN  -  H - Y character position [0..23]
+; IN  -  L - X character position [0..31]
+; OUT - HL - address (pixel area)
 ; OUT - AF - garbage
 get_char_address:
     ld a, h
@@ -102,7 +261,7 @@ get_char_address:
     ld l, a
     ld a, h
     and %00011000
-    or %01000000
+.A: or #40        ; self modifying code! see screen_select
     ld h, a
     ret
 
@@ -131,7 +290,7 @@ char_address_down:
 get_pixel_address:
     ld a, b             ; calculate Y2, Y1, Y0
     and %00000111       ; mask out unwanted bits
-    or %01000000        ; set base address of screen
+.A: or #40              ; set base address of screen. Self modifying code! see screen_select
     ld h, a             ; store in H
     ld a, b             ; calculate Y7, Y6
     rra                 ; shift to position
@@ -193,6 +352,51 @@ pixel_address_up:
     ld a, h
     add a, 8
     ld h, a
+    ret
+
+
+; Print NULL(0)-terminated string
+; IN  - IX - pointer to string
+; IN  -  H - Y character position [0..23]
+; IN  -  L - X character position [0..31]
+; OUT -  A - 0
+; OUT - IX - pointer to NULL byte
+; OUT -  F - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
+print_string0:
+    call get_char_address ; HL = screen address
+.loop:
+    ld a, (ix)            ; fetch the character to print
+    or a                  ; exit if NULL character detected
+    ret z                 ; ...
+    call print_char       ;
+    inc l                 ; go to the next screen address
+    inc ix                ; increase IX to the next character
+    jr .loop              ; loop back to print next character
+    ret
+
+; Print string
+; IN  - IX - pointer to string
+; IN  -  H - Y character position [0..23]
+; IN  -  L - X character position [0..31]
+; IN  -  B - string length
+; OUT -  A - 0
+; OUT - IX - pointer to NULL byte
+; OUT -  F - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
+print_stringl:
+    call get_char_address ; HL = screen address
+.loop:
+    ld a, (ix)            ; fetch the character to print
+    push bc               ;
+    call print_char       ;
+    pop bc                ;
+    inc l                 ; go to the next screen address
+    inc ix                ; increase IX to the next character
+    djnz .loop:           ; loop back to print next character
     ret
 
 

@@ -2,3 +2,5 @@ LAYOUT_DEBUG           equ #0201
 LAYOUT_TITLE_STR       equ #0201
 LAYOUT_TITLE           equ #0208
 LAYOUT_TITLE_LEN       equ 23
+LAYOUT_CURSOR_ATTR     equ #38
+LAYOUT_BG_ATTR         equ #46
