@@ -103,7 +103,9 @@ smf_parse_track_header:
 ; OUT -  F - Z = 1 on success, 0 on error
 ; OUT - AF - garbage
 ; OUT - BC - garbage
+; OUT - DE - garbage
 ; OUT - HL - garbage
+; OUT - IX - garbage
 ; OUT - IY - garbage
 smf_parse:
     ld bc, (default_tempo>> 0)&0xFFFF : ld (var_smf_file.tempo+0), bc ; set default tempo
@@ -114,10 +116,10 @@ smf_parse:
     ld a, (var_smf_file.num_tracks)   ; parse each track header
     ld ixl, a                         ; ...
     ld iy, var_smf_file.tracks        ; ...
+    ld de, smf_track_t                ; ...
 1:  call smf_parse_track_header       ; ...
     ret nz                            ; ... return on error
-    ld bc, smf_track_t                ; ...
-    add iy, bc                        ; ...
+    add iy, de                        ; ...
     dec ixl                           ; ...
     jp nz, 1b                         ; ...
     xor a                             ; set next track flags = 0
@@ -312,7 +314,6 @@ smf_get_next_delay:
 ; OUT - HL - next track position
 ; OUT -  F - garbage
 ; OUT - DE - garbage
-; OUT - IX - garbage
 smf_get_next_status:
 .parse_status_byte:
     call file_get_next_byte                   ; A = byte
@@ -347,16 +348,16 @@ smf_get_next_status:
     ret                                       ;
 .is_note:
     ld (iy+smf_track_t.last_status), a        ;
-    ld ixl, a                                 ;
+    ld d, a                                   ;
     and #f0                                   ; "sssscccc" - s - status byte, c - channel number
     ld bc, 2                                  ;
-    cp #90 : jr nz, 1f         : or ixl : ret ; note on
-1:  cp #80 : jr nz, 1f         : or ixl : ret ; note off
-1:  cp #a0 : jr nz, 1f         : or ixl : ret ; key after-touch
-1:  cp #b0 : jr nz, 1f         : or ixl : ret ; control change
-1:  cp #c0 : jr nz, 1f : dec c : or ixl : ret ; program (patch) change
-1:  cp #d0 : jr nz, 1f : dec c : or ixl : ret ; channel after-touch (aka "channel pressure")
-1:  cp #e0 : jr nz, 1f         : or ixl : ret ; pitch wheel change
+    cp #90 : jr nz, 1f         : or d : ret   ; note on
+1:  cp #80 : jr nz, 1f         : or d : ret   ; note off
+1:  cp #a0 : jr nz, 1f         : or d : ret   ; key after-touch
+1:  cp #b0 : jr nz, 1f         : or d : ret   ; control change
+1:  cp #c0 : jr nz, 1f : dec c : or d : ret   ; program (patch) change
+1:  cp #d0 : jr nz, 1f : dec c : or d : ret   ; channel after-touch (aka "channel pressure")
+1:  cp #e0 : jr nz, 1f         : or d : ret   ; pitch wheel change
 .eof:
 1:  xor a                                     ; not valid command, set to zero
     ret                                       ;
