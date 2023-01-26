@@ -56,6 +56,9 @@ device_detect_cpu_int:
     ; 48K        14       279552   50.08      2117
     ; 128K       14       283632   49.36      2192     all known machines with turbo and 128K timings are 3.5x-based
     ; Pentagon   14       286720   48.828125  21f0
+    ; 48K        28       559104   50.08      422e
+    ; 128K       28       567264   49.36      4324     all known machines with turbo and 128K timings are 3.5x-based
+    ; Pentagon   28       573440   48.828125  43e0
 1:  ld hl,#0845+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_3_5_MHZ  << 8) | INT_50_HZ   : ret
 1:  ld hl,#0864+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_3_54_MHZ << 8) | INT_50_HZ   : ret
 1:  ld hl,#087c+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_3_5_MHZ  << 8) | INT_48_8_HZ : ret
@@ -64,4 +67,7 @@ device_detect_cpu_int:
 1:  ld hl,#10f8+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_7_MHZ    << 8) | INT_48_8_HZ : ret
 1:  ld hl,#2117+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_14_MHZ   << 8) | INT_50_HZ   : ret
 1:  ld hl,#2192+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_14_MHZ   << 8) | INT_50_HZ   : ret
-1:/*ld hl,#21f0+10 : sbc hl,bc : jr c,1f :*/ ld de, (CPU_FREQ_14_MHZ   << 8) | INT_48_8_HZ : ret
+1:  ld hl,#21f0+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_14_MHZ   << 8) | INT_48_8_HZ : ret
+1:  ld hl,#422e+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_28_MHZ   << 8) | INT_50_HZ   : ret
+1:  ld hl,#4324+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_28_MHZ   << 8) | INT_50_HZ   : ret
+1:/*ld hl,#43e0+10 : sbc hl,bc : jr c,1f :*/ ld de, (CPU_FREQ_28_MHZ   << 8) | INT_48_8_HZ : ret

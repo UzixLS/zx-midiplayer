@@ -9,6 +9,8 @@ uart_init:
     ld a, #fc                        ;
     out (c), a                       ; Enable port A output.
     ld a, (var_cpu_freq)             ; if (cpu frequency != 3.5MHz) then patch code for it
+    cp CPU_FREQ_28_MHZ               ;
+    jp z, uart_patch_for_cpu_28mhz   ;
     cp CPU_FREQ_14_MHZ               ;
     jp z, uart_patch_for_cpu_14mhz   ;
     cp CPU_FREQ_7_MHZ                ;
@@ -38,6 +40,14 @@ uart_patch_for_cpu_14mhz
     ld a, 25                         ; ld a, 25
     ld (uart_putc.D+1), a            ; ...
     ret                              ;
+uart_patch_for_cpu_28mhz
+    ld a, 48                         ; ld e, 48
+    ld (uart_putc.E+1), a            ;
+    ld a, 59                         ; ld a, 59
+    ld (uart_putc.C+1), a            ; ...
+    ld a, 57                         ; ld a, 57
+    ld (uart_putc.D+1), a            ; ...
+    ret                              ;
 
 
 ; Send byte to MIDI device
@@ -59,9 +69,9 @@ uart_putc:
 .delay_after_start_bit:
 .A: ld a, 0            ; (7) Introduce delays such that the next bit is output 112 T-states from now. Self modifying code! See uart_patch_for_cpu_3_54mhz
     ld a, r            ; (9)
-.C: ld a, 3            ; (7) Self modifying code! See uart_patch_for_cpu_*. Patched for 112/224/448 T-states total
-1:  dec a              ; (4*3) or (4*11) or (4*27)
-    jp nz, 1b          ; (10*3) or (10*11) or (10*27)
+.C: ld a, 3            ; (7) Self modifying code! See uart_patch_for_cpu_*. Patched for 112/224/448/896 T-states total
+1:  dec a              ; (4*3) or (4*11) or (4*27) or (4*59)
+    jp nz, 1b          ; (10*3) or (10*11) or (10*27) or (10*59)
 
 .send_bits:
     ld a, e            ; (4) Retrieve the byte to send.
@@ -84,9 +94,9 @@ uart_putc:
     nop                ; (4)
     nop                ; (4)
     nop                ; (4)
-.D: ld a, 1            ; (7) Self modifying code! See uart_patch_for_cpu_*. Patched for 112/224/448 T-states total
-1:  dec a              ; (4*1) or (4*9) or (4*25)
-    jp nz, 1b          ; (10*1) or (10*9) or (4*25)
+.D: ld a, 1            ; (7) Self modifying code! See uart_patch_for_cpu_*. Patched for 112/224/448/896 T-states total
+1:  dec a              ; (4*1) or (4*9) or (4*25) or (4*57)
+    jp nz, 1b          ; (10*1) or (10*9) or (10*25) or (10*57)
 .check_for_loop:
     ld a, e            ; (4) Retrieve the remaining bits to send.
     dec d              ; (4) Decrement the bit counter.

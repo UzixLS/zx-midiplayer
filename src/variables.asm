@@ -2,6 +2,7 @@ CPU_FREQ_3_5_MHZ  equ 0
 CPU_FREQ_3_54_MHZ equ 1
 CPU_FREQ_7_MHZ    equ 2
 CPU_FREQ_14_MHZ   equ 3
+CPU_FREQ_28_MHZ   equ 4
 var_cpu_freq BYTE CPU_FREQ_3_5_MHZ
 
 INT_50_HZ   equ 0
