@@ -396,8 +396,10 @@ smf_process_track:
     call smf_get_next_delay                           ;
     bit SMF_TRACK_FLAGS_DELAY, (iy+smf_track_t.flags) ; if no delay - get status
     jr z, .get_status                                 ; ...
-    scf                                               ; set C flag
-    ret                                               ;
+    push hl                                           ;
+    call smf_check_delay                              ; check if delay has been completed prematurely
+    pop hl                                            ;
+    ret c                                             ; ... exit if no
 .get_status:
     call smf_get_next_status                          ;
     or a                                              ; set Z flag if command is 0 (aka not valid)
