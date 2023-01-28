@@ -20,6 +20,7 @@ var_input_key BYTE INPUT_KEY_NONE
 var_input_key_last: BYTE INPUT_KEY_NONE
 var_input_key_hold_timer: BYTE 0
 
+var_basic_iy WORD 0
 var_int_counter WORD 0
 var_smf_file smf_file_t
 var_tmp32 BLOCK 32

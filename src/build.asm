@@ -9,8 +9,9 @@
 
 ; === SNA file ===
     lua allpass
-        incbin_pages("res/play.scr",   0, nil, 0x4000, {0})
+        incbin_pages("res/start.scr",  0, nil, 0x4000, {0})
         incbin_pages("res/files.scr",  0, nil, 0xC000, {7})
+        incbin_pages("res/play.scr",   0, nil, 0xC000+6912, {7})
         incbin_pages("build/main.bin", 0, nil, _c("begin"), {0})
         incbin_pages("res/test0.mid",  0, nil, 0xC000, {0,4,6,3})
     endlua
@@ -33,13 +34,16 @@ boot_b:
     ld b, screen_sectors              ;
     call .sub_load                    ;
     ld hl, #8000                      ;
-    ld de, #4000                      ; screen1
+    ld de, #4000                      ; screen_start
     call .sub_unpack                  ;
-    ld a, #17                         ; screen2
+    xor a                             ; set black border
+    out (#fe), a                      ; ...
+    ld a, #10 + screen0_page          ; screen_files
     ld bc, #7ffd                      ;
     out (c), a                        ;
-    ld de, #c000                      ;
+    ld de, screen0                    ;
     call .sub_unpack                  ;
+    call .sub_unpack                  ; screen_play
 
     ld a, #10                         ; code
     ld bc, #7ffd                      ;
@@ -50,10 +54,6 @@ boot_b:
     ld hl, #c000                      ;
     ld de, begin                      ;
     call .sub_unpack                  ;
-
-    ld hl, #c000                      ;
-    ld b, testmid_sectors             ;
-    call .sub_load                    ;
 
     jp main                           ;
 
@@ -95,10 +95,12 @@ boot_b:
 
     org 0
     lua allpass
-        incbin_rle("res/play.scr")
+        incbin_rle("res/start.scr")
         incbin_rle("res/files.scr")
+        incbin_rle("res/play.scr")
         sj.insert_label("screen_sectors", math.ceil(sj.current_address/256))
     endlua
+    assert $ < #4000
     savetrd "main.trd", &"boot.B", 0, $
 
     org 0
@@ -106,11 +108,13 @@ boot_b:
         incbin_rle("build/main.bin")
         sj.insert_label("code_sectors", math.ceil(sj.current_address/256))
     endlua
+    assert $ < #4000
     savetrd "main.trd", &"boot.B", 0, $
 
-    org 0
-    incbin "res/test1.mid"
     lua allpass
-        sj.insert_label("testmid_sectors", math.ceil(sj.current_address/256))
+        for file_name in io.popen([[ls "res/midi/"]]):lines() do
+            _pc("org 0")
+            _pc(string.format("incbin \"res/midi/%s\"", file_name))
+            _pc(string.format("savetrd \"main.trd\", \"%s\", 0, $", file_name))
+        end
     endlua
-    savetrd "main.trd", &"boot.B", 0, $

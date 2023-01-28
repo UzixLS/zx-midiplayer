@@ -17,6 +17,6 @@ clean:
 	rm -rf build/ .tmp/
 
 run:
-	EsPectrum build/main.tap
+	EsPectrum build/main.trd
 
 -include Makefile.local

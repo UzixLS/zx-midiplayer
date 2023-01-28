@@ -4,9 +4,15 @@
     DEVICE ZXSPECTRUM128,stack_top
 
     page 0
-    org #7f74
+    org int_handler-(variables0_end-variables0)
+    assert $ >= #6000
 begin:
     db "Code begin",0
+variables0:
+    include "variables0.asm"
+variables0_end:
+
+    org #7f7f
 int_handler:
     push af
     ld a, (var_int_counter+1)
@@ -25,64 +31,76 @@ int_im2_vector_table:
                 ; so we just play safe and use symmetric int handler address and vector table with one extra byte
 
 main:
-    di               ;
-    ld sp, stack_top ;
-    ld a, #80        ; set IM2 interrupt table address (#8000-#8100)
-    ld i, a          ; ...
-    im 2             ; ...
-    ld a, #10        ; page BASIC48
-    ld bc, #7ffd     ; ...
-    out (c), a       ; ...
-    ld a, #01        ; set blue border
-    out (#fe), a     ; ...
-    call device_detect_cpu_int ;
-    call uart_init             ;
-    call input_detect_kempston ;
+    di                              ;
+    ld sp, stack_top                ;
+    ld (var_basic_iy), iy           ; save IY as it required for BASIC/TRDOS calls
+    ld a, high int_im2_vector_table ; set IM2 interrupt table address (#8000-#8100)
+    ld i, a                         ; ...
+    im 2                            ; ...
+    xor a                           ; set black border
+    out (#fe), a                    ; ...
+    ld a, #10                       ; page BASIC48
+    ld bc, #7ffd                    ; ...
+    out (c), a                      ; ...
+    call device_detect_cpu_int      ;
+    call uart_init                  ;
+    call input_detect_kempston      ;
+    call play_file                  ; file may be already loaded in ram
+    call file_load_catalogue        ;
+    call load_screen0               ;
+    ld iy, file_menu                ;
+    call menu_first_draw            ;
+.loop:
+    ei : halt
+    call input_process              ;
+    ld iy, file_menu                ;
+    call menu_handle_input          ;
+    jp .loop                        ;
 
-    ; call #3d21    ; init
-    ; ld a, 0       ; drive = a
-    ; ld c, 1       ; function = select drive
-    ; call #3d13    ; ...
-    ; ld a, (#5cf6)
-    ; ld (#5cf9), a
-    ; ld a, 2       ; dst = screen
-    ; ld c, 7       ; function = list files
-    ; call #3d13
 
-    ; call menu_debug_loop
+play_file:
+    ld ix, file_base_addr     ;
+    call smf_parse            ;
+    ret nz                    ;
+    call load_screen1         ;
+    ld hl, LAYOUT_TITLE_STR   ;
+    ld ix, string_title       ;
+    call print_string0        ;
+    call player_loop          ;
+    call load_screen0         ;
+    ld iy, file_menu          ;
+    call menu_draw            ;
+    ret                       ;
 
-    ld hl, LAYOUT_TITLE_STR
-    ld ix, string_title
-    call print_string0
 
-    ld ix, #c000
-    call smf_parse
-    jp nz, loop
-    call player_loop
-    ld a, #02      ; set red border
-    out (#fe), a   ; ...
-loop:
-    ei
-    halt
-    call input_process
-    jp loop
+; IN  - DE - entry number (assume < 128)
+file_menu_callback:
+    push de
+    call file_load
+    call play_file
+    pop de
+    ret
 
+    include "config.inc"
+    include "layout.inc"
 
     include "input.asm"
+    include "menu.asm"
     include "file.asm"
     include "uart.asm"
     include "math.asm"
-    include "menu.asm"
     include "smf.asm"
     include "player.asm"
     include "draw.asm"
     include "device.asm"
+    include "screen.asm"
 
-    include "config.asm"
-    include "layout.asm"
     include "strings.asm"
 
     include "variables.asm"
+
+file_menu: menu_t file_menu_generator 0 file_menu_callback LAYOUT_FILEMENU_X LAYOUT_FILEMENU_Y LAYOUT_FILEMENU_LINES LAYOUT_FILEMENU_COLUMNS
+
 
 buildversion:
     ifdef VERSION

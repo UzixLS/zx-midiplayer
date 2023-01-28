@@ -38,7 +38,7 @@ menu_draw_selected_item:
 
 
 ; IN  - IY - *menu_t
-menu_redraw:
+menu_first_draw:
     xor a                               ;
     ld (iy+menu_t._top_element+0), a    ;
     ld (iy+menu_t._top_element+1), a    ;
@@ -276,7 +276,7 @@ menu_handle_input:
 ;     ld a, #c0
 ;     call screen_select
 ;     ld iy, menu_debug
-;     call menu_redraw
+;     call menu_first_draw
 ; .loop:
 ;     ei : halt
 ;     call input_process
