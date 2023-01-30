@@ -101,31 +101,158 @@ trdos_exec_fun:
 
 
 file_load_catalogue:
-    xor a                         ; set zero byte to first file name - same as clearing file list
-    ld (file_buffer), a           ; ...
-    di                            ;
-    call trdos_entrypoint_init    ;
-    ld c, trdos_fun_select_drive  ; select drive A
-    ld a, 0                       ; ...
-    call trdos_exec_fun           ; ...
-    ld c, trdos_fun_read_block    ; read file table
-    ld hl, file_buffer            ; ...
-    ld b, trdos_catalogue_sectors ; ...
-    ld de, #0000                  ; ...
-    call trdos_exec_fun           ; ...
-    ret                           ;
+    xor a                                 ; set zero byte to first file name - same as clearing file list
+    ld (file_buffer), a                   ; ...
+    di                                    ;
+    call trdos_entrypoint_init            ;
+    ld c, trdos_fun_select_drive          ; select drive A
+    ld a, 0                               ; ...
+    call trdos_exec_fun                   ; ...
+    ld c, trdos_fun_read_block            ; read file table
+    ld hl, file_buffer                    ; ...
+    ld b, trdos_catalogue_sectors         ; ...
+    ld de, #0000                          ; ...
+    call trdos_exec_fun                   ; ...
+    call file_catalogue_optimize          ;
+    call file_catalogue_format_extensions ;
+    call file_catalogue_set_icons         ;
+    ret
 
-
-file_defrag_catalogue:            ; reorganize catalouge to skip all deleted files
+file_catalogue_optimize:          ; reorganize catalogue to skip all deleted files
     ld b, trdos_max_files         ;
     ld de, trdos_file_header_size ;
-    ld hl, file_buffer            ;
-    xor a                         ;
+    ld hl, file_buffer            ; HL = pointer for entries_all
+    ld ix, file_buffer            ; IX = pointer for entries_good
 .loop:
-    ld (hl), a                    ;
+    ld a, (hl)                    ;
+    or a                          ; if first byte == #00 - no entry
+    jr z, .bad_entry              ; ...
+    dec a                         ; if first byte == #01 - deleted entry
+    jr z, .bad_entry              ; ...
+.good_entry:
+    ld a, (hl)                    ; save good entry
+    ld (ix), a                    ;
+    inc hl                        ;
+    inc ix                        ;
+    dec e                         ;
+    jr nz, .good_entry            ;
+    ld e, trdos_file_header_size  ;
+    djnz .loop                    ;
+    jp .exit                      ;
+.bad_entry:
     add hl, de                    ; HL += trdos_file_header_size
     djnz .loop                    ;
+.exit:
+    xor a                         ; place NULL byte to the last entry. This entry may be +1 byte above trdos_max_files*trdos_file_header_size
+    ld (ix), a                    ; ... boundary. So file_buffer should be at least trdos_max_files*trdos_file_header_size+1 bytes
     ret                           ;
+
+file_catalogue_format_extensions:
+    ld b, trdos_max_files         ;
+    ld de, trdos_file_header_size ;
+    ld ix, file_buffer            ;
+.loop:
+    ld a, (ix+9)                  ; if 2nd and 3rd extensions symbols are in ascii range - assume extension is 3-chars-wide
+    cp '0'                        ; ...
+    jp c, .invalid_extension      ; ...
+    cp 'z'+1                      ; ...
+    jp nc, .invalid_extension     ; ...
+    ld a, (ix+10)                 ; ...
+    cp '0'                        ; ...
+    jp c, .invalid_extension      ; ...
+    cp 'z'+1                      ; ...
+    jp nc, .invalid_extension     ; ...
+    add ix, de                    ;
+    djnz .loop                    ;
+.invalid_extension:
+    xor a                         ; if extension is 1-char wide - just write NULL to 2nd and 3rd bytes
+    ld (ix+9), a                  ; ...
+    ld (ix+10), a                 ; ...
+    add ix, de                    ;
+    djnz .loop                    ;
+    ret                           ;
+
+file_catalogue_set_icons:
+    ld b, trdos_max_files         ;
+    ld de, trdos_file_header_size ;
+    ld ix, file_buffer            ;
+.loop:
+    ld a, (ix+8)                  ; if extension is "mid" - set appropriate icon
+    cp 'm' : jr z, 1f             ;
+    cp 'M' : jr nz, .not_mid      ;
+1:  ld a, (ix+9)                  ;
+    cp 'i' : jr z, 1f             ;
+    cp 'I' : jr nz, .not_mid      ;
+1:  ld a, (ix+10)                 ;
+    cp 'd' : jr z, 1f             ;
+    cp 'D' : jr nz, .not_mid      ;
+1:  ld a, udg_melody              ;
+    ld (ix+11), a                 ;
+    add ix, de                    ;
+    djnz .loop                    ;
+.not_mid:
+    ld a, ' '                     ; if extension is not "mid" - set space instead icon
+    ld (ix+11), a                 ;
+    add ix, de                    ;
+    djnz .loop                    ;
+    ret                           ;
+
+
+; IN  - DE - entry number
+; OUT -  F - NZ when ok, Z when not ok
+; OUT - IX - pointer to 0-terminated string
+file_menu_generator:
+    xor a                     ; if (entry_number >= 128) - return not ok
+    or d                      ; ...
+    jp z, 1f                  ; ...
+    xor a                     ; ... set Z flag
+    ret                       ; ...
+1:  ld a, e                   ; ...
+    cp trdos_max_files        ; ...
+    jp c, 1f                  ; ...
+    xor a                     ; ... set Z flag
+    ret                       ; ...
+1:  push de                   ;
+    sla e : rl d              ; entry_number = entry_number * 16
+    sla e : rl d              ; ...
+    sla e : rl d              ; ...
+    sla e : rl d              ; ...
+    ld hl, file_buffer        ; HL = file_buffer + entry_number * 16
+    add hl, de                ; ...
+    pop de                    ;
+    ld a, (hl)                ; if first byte == NULL - return error (no entry)
+    or a                      ; ...
+    ret z                     ; ...
+    ld ix, file_menu_string+2 ;
+    push bc                   ;
+    ld b, 8                   ;
+.filenamecopy:                ;
+    ld a, (hl)                ;
+    ld (ix), a                ;
+    inc hl                    ;
+    inc ix                    ;
+    djnz .filenamecopy        ;
+    ld a, '.'                 ;
+    ld (ix), a                ;
+    inc ix                    ;
+    ld b, 3                   ;
+.extcopy:
+    ld a, (hl)                ;
+    ld (ix), a                ;
+    inc hl                    ;
+    inc ix                    ;
+    djnz .extcopy             ;
+    xor a                     ;
+.filesize:
+.icon:
+    ld ix, file_menu_string   ;
+    ld a, (hl)                ; icon
+    ld (ix), a                ;
+    ld a, ' '                 ; space
+    ld (ix+1), a              ;
+    pop bc                    ;
+    or 1                      ; set NZ flag
+    ret                       ;
 
 
 ; IN  - E - file number [0..127]
@@ -176,35 +303,3 @@ file_load:
     ld a, #0f                               ; reset page
     ld (file_get_next_byte.pg+1), a         ; ...
     ret                                     ;
-
-
-
-; IN  - DE - entry number
-; OUT -  F - NZ when ok, Z when not ok
-; OUT - IX - pointer to 0-terminated string
-file_menu_generator:
-    xor a                     ; if (entry_number >= 128) - return not ok
-    or d                      ; ...
-    jp z, 1f                  ; ...
-    xor a                     ; ... set Z flag
-    ret                       ; ...
-1:  ld a, e                   ; ...
-    cp trdos_max_files        ; ...
-    jp c, 1f                  ; ...
-    xor a                     ; ... set Z flag
-    ret                       ; ...
-1:  push de                   ;
-    sla e : rl d              ; entry_number = entry_number * 16
-    sla e : rl d              ; ...
-    sla e : rl d              ; ...
-    sla e : rl d              ; ...
-    ld ix, file_buffer        ; IX = file_buffer + entry_number * 16
-    add ix, de                ; ...
-    pop de                    ;
-    ld a, (ix)                ; if first byte == #00 - return error (no entry)
-    or a                      ; ...
-    ret z                     ; ...
-    dec a                     ; if first byte == #01 - return error (deleted entry)
-    ret z                     ; ...
-    ld (ix+8), 0              ;
-    ret                       ;

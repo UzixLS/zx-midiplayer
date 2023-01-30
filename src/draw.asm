@@ -468,34 +468,25 @@ print_char_at:
 ; OUT - DE - garbage
 print_char:
     ld de, 0x3c00       ; address of character set in rom
-    push hl
+    cp 128              ; use UDG character set if character >= 128
+    jp c, 1f            ; ...
+    ld de, udg          ; ...
+    sub 128             ; ...
+1:  push hl
     ld b, 0             ; get index into character set
     ld c, a
-    dup 3
-    sla c
-    rl b
-    edup
-    ex de, hl
-    add hl, bc
-    ex de, hl
-    call print_udg8
-    pop hl
-    ret
-
-
-; Print a UDG (Single Height)
-; IN  - DE - character data
-; IN  - HL - screen address
-; OUT - AF - garbage
-; OUT -  B - garbage
-; OUT - DE - garbage
-; OUT -  H - garbage
-print_udg8:
+    sla c : rl b        ; address = character_set_address + character_code * 8
+    sla c : rl b        ; ...
+    sla c : rl b        ; ...
+    ex de, hl           ; ...
+    add hl, bc          ; ...
+.print_udg8:
     ld b, 8             ; loop counter
 .loop:
-    ld a, (de)          ; get the byte from the ROM into A
-    ld (hl), a          ; stick A onto the screen
-    inc de              ; goto next byte of character
-    inc h               ; goto next line on screen
+    ld a, (hl)          ; get the byte from the ROM into A
+    ld (de), a          ; stick A onto the screen
+    inc hl              ; goto next byte of character
+    inc d               ; goto next line on screen
     djnz .loop          ; loop around whilst it is Not Zero (NZ)
+    pop hl
     ret

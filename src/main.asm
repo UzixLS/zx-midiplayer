@@ -9,7 +9,7 @@
 begin:
     db "Code begin",0
 variables0:
-    include "variables0.asm"
+    include "variables_low.asm"
 variables0_end:
 
     org #7f7f
@@ -95,6 +95,7 @@ file_menu_callback:
     include "device.asm"
     include "screen.asm"
 
+    include "udg.asm"
     include "strings.asm"
 
     include "variables.asm"
