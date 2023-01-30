@@ -1,10 +1,13 @@
 ; IN  - HL - file position of first track data byte
 player_loop:
-    ld a, #ff                      ; issue reset status
-    di : call uart_putc : ei       ; ...
-    halt                           ; wait 20ms just for safety
+    call player_reset_chip         ;
 .loop:
     halt
+    call input_process             ;
+    ld a, (var_input_key)          ;
+    cp INPUT_KEY_BACK              ;
+    jr z, .end                     ;
+.process_tracks:
     call smf_get_first_track       ;
     jr z, .end                     ;
 .process_current_track:
@@ -32,8 +35,25 @@ player_loop:
     jr z, .loop                    ;
     jp .process_current_track      ;
 .end:
+    ; jp player_reset_chip           ;
+
+
+player_reset_chip:
     ld a, #ff                      ; issue reset status
     di : call uart_putc : ei       ; ...
+    halt                           ; wait 20ms just for safety
+    ld ixl, #b0                    ; set controller message for channels #0..#f
+    ld a, ixl                      ;
+.loop:
+    di : call uart_putc : ei       ;
+    ld a, 123                      ; 121 = all controllers off (this message clears all the controller values for this channel, back to their default values)
+    di : call uart_putc : ei       ;
+    xor a                          ; 0 = value
+    di : call uart_putc : ei       ;
+    inc ixl                        ;
+    ld a, ixl                      ;
+    cp #c0                         ;
+    jp nz, .loop                   ;
     ret                            ;
 
 
