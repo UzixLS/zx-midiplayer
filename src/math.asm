@@ -23,7 +23,7 @@ div32by16:
     ret
 .overflow:
     or a
-    sbc hl,de
+    sbc hl, de
 .setbit:
     .db $DD, $2C     ; inc ixl, change to inc ix to avoid undocumented
     djnz .loop

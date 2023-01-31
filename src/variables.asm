@@ -24,3 +24,6 @@ var_basic_iy WORD 0
 var_int_counter WORD 0
 var_smf_file smf_file_t
 var_tmp32 BLOCK 32
+
+PLAYER_FLAG_TITLE_SET equ 0
+var_player_flags BYTE 0
