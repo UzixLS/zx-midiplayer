@@ -177,25 +177,36 @@ file_catalogue_set_icons:
     ld de, trdos_file_header_size ;
     ld ix, file_buffer            ;
 .loop:
-    ld a, (ix+8)                  ; if extension is "mid" - set appropriate icon
-    cp 'm' : jr z, 1f             ;
-    cp 'M' : jr nz, .not_mid      ;
-1:  ld a, (ix+9)                  ;
-    cp 'i' : jr z, 1f             ;
-    cp 'I' : jr nz, .not_mid      ;
-1:  ld a, (ix+10)                 ;
-    cp 'd' : jr z, 1f             ;
-    cp 'D' : jr nz, .not_mid      ;
-1:  ld a, udg_melody              ;
-    ld (ix+11), a                 ;
-    add ix, de                    ;
-    djnz .loop                    ;
-.not_mid:
-    ld a, ' '                     ; if extension is not "mid" - set space instead icon
-    ld (ix+11), a                 ;
-    add ix, de                    ;
-    djnz .loop                    ;
-    ret                           ;
+.check_mid_extension:
+    ld a, (ix+8)                         ; if extension is "mid" - set appropriate icon
+    cp 'm' : jr z, 1f                    ;
+    cp 'M' : jr nz, .check_rmi_extension ;
+1:  ld a, (ix+9)                         ;
+    cp 'i' : jr z, 1f                    ;
+    cp 'I' : jr nz, .check_rmi_extension ;
+1:  ld a, (ix+10)                        ;
+    cp 'd' : jr z, .set_icon             ;
+    cp 'D' : jr z, .set_icon             ;
+.check_rmi_extension:
+    ld a, (ix+8)                         ; if extension is "rmi" - set appropriate icon
+    cp 'r' : jr z, 1f                    ;
+    cp 'R' : jr nz, .no_icon             ;
+1:  ld a, (ix+9)                         ;
+    cp 'm' : jr z, 1f                    ;
+    cp 'M' : jr nz, .no_icon             ;
+1:  ld a, (ix+10)                        ;
+    cp 'i' : jr z, .set_icon             ;
+    cp 'I' : jr z, .set_icon             ;
+.no_icon:
+    ld a, ' '                            ; if extension isn't recognized - set empty icon (space)
+    jr .set                              ;
+.set_icon:
+    ld a, udg_melody                     ;
+.set:
+    ld (ix+11), a                        ;
+    add ix, de                           ;
+    djnz .loop                           ;
+    ret                                  ;
 
 
 ; IN  - DE - entry number

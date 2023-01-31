@@ -1,5 +1,13 @@
+    STRUCT chunk_riff_header_t
+id            DWORD ; "RIFF"
+len           DWORD
+id2           DWORD ; "RMID"
+id3           DWORD ; "data"
+len2          DWORD
+    ENDS
+
     STRUCT chunk_header_t
-id            DWORD
+id            DWORD ; "MThd" or "MTrk"
 len           DWORD
     ENDS
 
@@ -43,31 +51,54 @@ max_tracks = 40
 
 
 ; IN  - HL - position of beginning of file
+; OUT - HL - position of next byte after end of chunk
+; OUT - AF - garbage
+; OUT - BC - garbage
+smf_parse_file_header_rmi:
+    push hl                                    ;
+    call .sub                                  ;
+    pop hl                                     ;
+    jr z, .is_riff                             ;
+    ret                                        ;
+.is_riff:
+    ld bc, chunk_riff_header_t                 ; skip riff header
+    add hl, bc                                 ; ...
+    ret                                        ;
+.sub
+    call file_get_next_byte : cp 'R' : ret nz  ;
+    call file_get_next_byte : cp 'I' : ret nz  ;
+    call file_get_next_byte : cp 'F' : ret nz  ;
+    call file_get_next_byte : cp 'F' : ret nz  ;
+    xor a                                      ; set Z flag
+    ret                                        ;
+
+
+; IN  - HL - position of beginning of file
 ; OUT -  F - Z = 1 on success, 0 on error
 ; OUT - HL - position of next byte after end of chunk
 ; OUT - AF - garbage
 ; OUT - BC - garbage
 smf_parse_file_header:
-    call file_get_next_byte : cp 'M' : ret nz ; chunk_header_t.id[0]
-    call file_get_next_byte : cp 'T' : ret nz ; chunk_header_t.id[1]
-    call file_get_next_byte : cp 'h' : ret nz ; chunk_header_t.id[2]
-    call file_get_next_byte : cp 'd' : ret nz ; chunk_header_t.id[3]
-    call file_get_next_byte : cp 0   : ret nz ; chunk_header_t.len[0]
-    call file_get_next_byte : cp 0   : ret nz ; chunk_header_t.len[1]
-    call file_get_next_byte : cp 0   : ret nz ; chunk_header_t.len[2]
-    call file_get_next_byte : cp 6   : ret nz ; chunk_header_t.len[3]
-    call file_get_next_byte : cp 0   : ret nz ; chunk_mthd_t.format[0]
-    call file_get_next_byte :                 ; chunk_mthd_t.format[1]
-    or 1 : cp 1 : ret nz                      ; if (format != 0 && format != 1) - return error
-    call file_get_next_byte : cp 0   : ret nz ; chunk_mthd_t.num_tracks[0]
-    call file_get_next_byte : ld (var_smf_file.num_tracks), a ; chunk_mthd_t.num_tracks[1]
-    cp max_tracks                                         ; if (num_tracks>max_tracks) - return error
-    jp c, 1f : jp z, 1f                                   ; ...
-    or 1                                                  ; reset Z flag
-    ret                                                   ; ...
-1:  call file_get_next_byte : ld (var_smf_file.ppqn+1), a ; chunk_mthd_t.division[0]
-    call file_get_next_byte : ld (var_smf_file.ppqn+0), a ; chunk_mthd_t.division[1]
-    xor a                                                 ; set Z flag
+    call file_get_next_byte : cp 'M' : ret nz                  ; chunk_header_t.id[0]
+    call file_get_next_byte : cp 'T' : ret nz                  ; chunk_header_t.id[1]
+    call file_get_next_byte : cp 'h' : ret nz                  ; chunk_header_t.id[2]
+    call file_get_next_byte : cp 'd' : ret nz                  ; chunk_header_t.id[3]
+    call file_get_next_byte : cp 0   : ret nz                  ; chunk_header_t.len[0]
+    call file_get_next_byte : cp 0   : ret nz                  ; chunk_header_t.len[1]
+    call file_get_next_byte : cp 0   : ret nz                  ; chunk_header_t.len[2]
+    call file_get_next_byte : cp 6   : ret nz                  ; chunk_header_t.len[3]
+    call file_get_next_byte : cp 0   : ret nz                  ; chunk_mthd_t.format[0]
+    call file_get_next_byte :                                  ; chunk_mthd_t.format[1]
+    or 1 : cp 1 : ret nz                                       ; if (format != 0 && format != 1) - return error
+    call file_get_next_byte : cp 0   : ret nz                  ; chunk_mthd_t.num_tracks[0]
+    call file_get_next_byte : ld (var_smf_file.num_tracks), a  ; chunk_mthd_t.num_tracks[1]
+    cp max_tracks                                              ; if (num_tracks>max_tracks) - return error
+    jp c, 1f : jp z, 1f                                        ; ...
+    or 1                                                       ; reset Z flag
+    ret                                                        ; ...
+1:  call file_get_next_byte : ld (var_smf_file.ppqn+1), a      ; chunk_mthd_t.division[0]
+    call file_get_next_byte : ld (var_smf_file.ppqn+0), a      ; chunk_mthd_t.division[1]
+    xor a                                                      ; set Z flag
     ret
 
 ; IN  - HL - position in file
@@ -115,6 +146,7 @@ smf_parse:
     ld bc, (default_tempo>> 0)&0xFFFF : ld (var_smf_file.tempo+0), bc ; set default tempo
     ld bc, (default_tempo>>16)&0xFFFF : ld (var_smf_file.tempo+2), bc ; ...
     ld hl, 0                          ; parse file header
+    call smf_parse_file_header_rmi    ; ... skip rmi header if present
     call smf_parse_file_header        ; ...
     ret nz                            ; ... return on error
     ld a, (var_smf_file.num_tracks)   ; parse each track header
