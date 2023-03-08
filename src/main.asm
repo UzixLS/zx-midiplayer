@@ -1,4 +1,4 @@
-    ASSERT __SJASMPLUS__ >= 0x011401 ; SjASMPlus 1.20.1
+    ASSERT __SJASMPLUS__ >= 0x011402 ; SjASMPlus 1.20.2
     OPT --syntax=abf
     SLDOPT COMMENT WPMEM, LOGPOINT, ASSERTION
     DEVICE ZXSPECTRUM128,stack_top
@@ -94,6 +94,7 @@ file_menu_callback:
     include "draw.asm"
     include "device.asm"
     include "screen.asm"
+    include "vis.asm"
 
     include "udg.asm"
     include "strings.asm"

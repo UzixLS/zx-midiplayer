@@ -27,3 +27,5 @@ var_tmp32 BLOCK 32
 
 PLAYER_FLAG_TITLE_SET equ 0
 var_player_flags BYTE 0
+
+var_vis_state vis_state_t

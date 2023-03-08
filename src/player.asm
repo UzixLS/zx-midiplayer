@@ -3,8 +3,14 @@ player_loop:
     xor a                          ;
     ld (var_player_flags), a       ;
     call player_reset_chip         ;
+    call vis_init                  ;
 .loop:
+    push hl
+    call vis_process_frame
+    pop hl
+    xor a : out (#fe), a
     halt
+    inc a : out (#fe), a
     call input_process             ;
     ld a, (var_input_key)          ;
     cp INPUT_KEY_BACK              ;
@@ -18,9 +24,13 @@ player_loop:
     jp z, .next_track              ; if Z == 1 (no data) then go to the next track
 .status_check:
     cp #ff                         ; do not send meta events to midi device
-    jp nz, .status_send            ; ...
+    jp nz, .vis                    ; ...
     call smf_handle_meta           ; ... instead, process it locally. HL = next track position
     jp .process_current_track      ; ...
+.vis:
+    push bc
+    call vis_process_command
+    pop bc
 .status_send:
     ld ixh, b : ld ixl, c          ; IX = data len
     di : call uart_putc : ei       ; send status
