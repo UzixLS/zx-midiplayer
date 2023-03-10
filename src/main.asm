@@ -3,6 +3,8 @@
     SLDOPT COMMENT WPMEM, LOGPOINT, ASSERTION
     DEVICE ZXSPECTRUM128,stack_top
 
+    includelua "lua/screen_address.lua"
+
     page 0
     org int_handler-(variables0_end-variables0)
     assert $ >= #6000

@@ -8,55 +8,138 @@ bar_diff    BLOCK LAYOUT_BARS_N ;
     ENDS
 
 
+
+vis_piano_key_addresses:
+    lua allpass
+        x = _c("LAYOUT_PIANO_KEYS_X")
+        y = _c("LAYOUT_PIANO_KEYS_Y")
+        for key = 0, _c("LAYOUT_PIANO_KEYS")-1 do
+
+            n = key % 12
+            if n==1 or n==3 or n==6 or n==8 or n==10 then
+                y_offset = _c("LAYOUT_PIANO_KEYS_Y_BLACK")
+            else
+                y_offset = 0;
+            end
+            if n==0 or n==2 or n==4 or n==5 or n==7 or n==9 or n==11 then
+                x_append = 8
+            else
+                x_append = 0
+            end
+            address = screen_address_pixel(x, y + y_offset)
+            if y_offset ~= 0 then
+                address = address | 0x8000
+            end
+            sj.add_word(address)
+            x = x + x_append
+            if x >= _c("LAYOUT_PIANO_KEYS_WIDTH") then
+                x = 0
+                y = y + _c("LAYOUT_PIANO_KEYS_Y_APPEND")
+            end
+        end
+    endlua
+    DW #4000 ; just for safety
+
+
+
+; IN  - A  - velocity
+; IN  - C  - note number
+; OUT - AF - garbage
+; OUT - BC - garbage
+; OUT - HL - garbage
+; OUT - IX - garbage
+vis_process_key:
+    or a                                                                    ;
+    jr z, .off                                                              ;
+.on:
+    ld ix, (LAYOUT_PIANO_KEYS_BLACK_ON << 8) | LAYOUT_PIANO_KEYS_WHITE_ON   ;
+    jp 1f                                                                   ;
+.off:
+    ld ix, (LAYOUT_PIANO_KEYS_BLACK_OFF << 8) | LAYOUT_PIANO_KEYS_WHITE_OFF ;
+1:  ld a, c                                                                 ; if (note < FIRST || note > last) ret
+    sub PIANO_KEYS_FIRST                                                    ; ...
+    ret c                                                                   ; ...
+    cp LAYOUT_PIANO_KEYS                                                    ; ...
+    ret nc                                                                  ; ...
+    ld c, a                                                                 ; HL = vis_piano_key_addresses[key_number]
+    sla c                                                                   ; ...
+    ld b, 0                                                                 ; ...
+    ld hl, vis_piano_key_addresses                                          ; ...
+    add hl, bc                                                              ; ...
+    ld c, (hl)                                                              ; ...
+    inc hl                                                                  ; ...
+    ld h, (hl)                                                              ; ...
+    ld l, c                                                                 ; ...
+    bit 7, h                                                                ; if (address & 0x8000) - assume black key
+    jp nz, .black                                                           ; ...
+.white:
+    ld b, ixl                                                               ; ...
+    jp 1f                                                                   ; ...
+.black:
+    res 7, h                                                                ; ...
+    ld b, ixh                                                               ; ...
+1:  DUP LAYOUT_PIANO_KEYS_ON_LINES
+        ld (hl), b                                                          ; write to screen
+        inc h                                                               ; ...
+    EDUP
+    ret                                                                     ;
+
+
 ; IN - A  - command byte
 ; IN - HL - file position
+; OUT - F  - garbage
 ; OUT - BC - garbage
+; OUT - DE - garbage
+; OUT - IX - garbage
 vis_process_command:
-    ld ixl, a                                    ;
+    ld e, a                                      ; E = command
     and #f0                                      ; (command == 0x80 || command == 0x90)?
-    cp #90                                       ;
-    jp z, .note_on                               ;
-    ; cp #80                                       ;
-    ; jp z, .note_off                              ;
-    ld a, ixl                                    ;
+    cp #90                                       ; ...
+    jp z, .note_on                               ; ...
+    cp #80                                       ; ...
+    jp z, .note_off                              ; ...
+    ld a, e                                      ;
     ret                                          ;
 .note_on:
-    ld a, ixl                                    ; BC = channel number
-    and #0f                                      ; ...
-    ld c, a                                      ; ...
-    ld b, 0                                      ; ...
     push hl                                      ;
-    call file_get_next_byte                      ; A = note number
-    call file_get_next_byte                      ; A = velocity
-    srl a : srl a                                ; 32 lines (4*8)
+    call file_get_next_byte                      ; C = note number
+    and #7f                                      ; ...
+    ld c, a                                      ; ...
+    call file_get_next_byte                      ; D = velocity
+    ld d, a                                      ; ...
+    call vis_process_key                         ;
     ld hl, var_vis_state+vis_state_t.bar_current ;
+    ld a, e                                      ;
+    and #0f                                      ;
+    ld c, a                                      ;
+    ld b, 0                                      ;
     add hl, bc                                   ;
+    ld a, d                                      ; A = velocity
+    srl a : srl a                                ; 32 lines (4*8)
     sub (hl)                                     ; A = new - current
     jr z, 1f                                     ;
     ld hl, var_vis_state+vis_state_t.bar_diff    ;
     add hl, bc                                   ;
     ld (hl), a                                   ; diff = A
 1:  pop hl                                       ;
-    ld a, ixl                                    ;
+    ld a, e                                      ;
     ret                                          ;
-; .note_off:
-;     ld a, ixl                                    ; BC = channel number
-;     and #0f                                      ; ...
-;     ld c, a                                      ; ...
-;     ld b, 0                                      ; ...
-;     push hl                                      ;
-;     ld hl, var_vis_state+vis_state_t.bar_current ;
-;     add hl, bc                                   ;
-;     xor a                                        ;
-;     sub (hl)                                     ; A = -current
-;     ld hl, var_vis_state+vis_state_t.bar_diff    ;
-;     add hl, bc                                   ;
-;     ld (hl), a                                   ; diff = A
-;     pop hl                                       ;
-;     ld a, ixl                                    ;
-;     ret                                          ;
+.note_off:
+    push hl                                      ;
+    call file_get_next_byte                      ; IXH = note number
+    ld c, a                                      ;
+    xor a                                        ;
+    call vis_process_key                         ;
+    pop hl                                       ;
+    ld a, e                                      ;
+    ret                                          ;
 
 
+; OUT - AF  - garbage
+; OUT - BC  - garbage
+; OUT - DE  - garbage
+; OUT - HL  - garbage
+; OUT - IXL - garbage
 vis_process_frame:
     ld de, LAYOUT_BARS_N-1                       ;
 .loop_next_chan:
