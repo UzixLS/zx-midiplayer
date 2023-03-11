@@ -65,9 +65,6 @@ play_file:
     call smf_parse            ;
     ret nz                    ;
     call load_screen1         ;
-    ld hl, LAYOUT_TITLE_STR   ;
-    ld ix, string_title       ;
-    call print_string0        ;
     call player_loop          ;
     call load_screen0         ;
     ld iy, file_menu          ;

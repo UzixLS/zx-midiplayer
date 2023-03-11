@@ -165,6 +165,32 @@ smf_parse:
     ret                               ;
 
 
+; OUT - C - tracks
+; OUT - A - garbage
+smf_get_num_tracks:
+    ld a, (var_smf_file.num_tracks) ;
+    ld c, a                         ;
+    ret                             ;
+
+; OUT - BC - ppqn
+; OUT - A - garbage
+smf_get_ppqn:
+    ld a, (var_smf_file.ppqn+0)     ;
+    ld c, a                         ;
+    ld a, (var_smf_file.ppqn+1)     ;
+    ld b, a                         ;
+    ret                             ;
+
+; OUT - CIX - tempo
+smf_get_tempo:
+    ld a, (var_smf_file.tempo+0)    ;
+    ld ixl, a                       ;
+    ld a, (var_smf_file.tempo+1)    ;
+    ld ixh, a                       ;
+    ld a, (var_smf_file.tempo+2)    ;
+    ld c, a                         ;
+    ret                             ;
+
 
 ; see smf_get_next_track
 ; if this function returns F/Z=1 then there is nothing to play anymore
@@ -452,9 +478,12 @@ smf_process_track:
 smf_update_tick_duration:                     ; tick_duration = tempo / ppqn / machine_constant, where machine_constant = (1000 * int_len_ms / 256)
     ld a, (var_smf_file.tempo+2)              ; ACIX = tempo
     ld c, a                                   ; ...
-    xor a                                     ; ... tempo is 24 bit value
     ld ix, (var_smf_file.tempo)               ; ...
     ld de, (var_smf_file.ppqn)                ;
+    push bc : push de                         ;
+    call player_set_tempo                     ;
+    pop de : pop bc                           ;
+    xor a                                     ; ... tempo is 24 bit value
     call div32by16                            ; ACIX = tempo/ppqn
     ld a, (var_int_type)                      ; DE = machine_constant
     or a                                      ; ...

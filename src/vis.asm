@@ -14,7 +14,6 @@ vis_piano_key_addresses:
         x = _c("LAYOUT_PIANO_KEYS_X")
         y = _c("LAYOUT_PIANO_KEYS_Y")
         for key = 0, _c("LAYOUT_PIANO_KEYS")-1 do
-
             n = key % 12
             if n==1 or n==3 or n==6 or n==8 or n==10 then
                 y_offset = _c("LAYOUT_PIANO_KEYS_Y_BLACK")
@@ -170,7 +169,7 @@ vis_process_frame:
     ld c, a                                      ; ...
     call get_pixel_address                       ;
 .bar_up_loop:
-    ld a, %00001111                              ;
+    ld a, LAYOUT_BARS_PIXELS                     ;
     ld (hl), a                                   ;
     dec ixl                                      ;
     jp z, .next_chan                             ;

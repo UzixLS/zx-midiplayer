@@ -1,7 +1,14 @@
 LAYOUT_DEBUG                   equ #0201
-LAYOUT_TITLE_STR               equ #0201
-LAYOUT_TITLE                   equ #0208
-LAYOUT_TITLE_LEN               equ 23
+LAYOUT_TITLE                   equ #0301
+LAYOUT_TITLE_LEN               equ 30
+LAYOUT_FILENAME                equ #0501
+LAYOUT_SIZE                    equ #0902
+LAYOUT_TRACKS                  equ #0B02
+LAYOUT_TEMPO                   equ #0D02
+LAYOUT_PPQN                    equ #0F02
+LAYOUT_TIME_MINUTES            equ #0518
+LAYOUT_TIME_SECONDS            equ #051b
+LAYOUT_TIME_SUBSECONDS         equ #051e
 LAYOUT_CURSOR_ATTR             equ #38
 LAYOUT_BG_ATTR                 equ #46
 LAYOUT_FILEMENU_X              equ 1
@@ -12,6 +19,7 @@ LAYOUT_BARS_X                  equ 64
 LAYOUT_BARS_Y                  equ 64
 LAYOUT_BARS_N                  equ 16
 LAYOUT_BARS_HEIGHT             equ 8*8
+LAYOUT_BARS_PIXELS             equ %01111110
 LAYOUT_PIANO_KEYS              equ 106
 LAYOUT_PIANO_KEYS_X            equ 0
 LAYOUT_PIANO_KEYS_WIDTH        equ 248

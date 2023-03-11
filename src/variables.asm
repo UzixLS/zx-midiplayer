@@ -25,7 +25,9 @@ var_int_counter WORD 0
 var_smf_file smf_file_t
 var_tmp32 BLOCK 32
 
-PLAYER_FLAG_TITLE_SET equ 0
-var_player_flags BYTE 0
+var_player_state player_state_t
 
 var_vis_state vis_state_t
+
+var_current_file_number WORD 0
+var_current_file_size WORD 0

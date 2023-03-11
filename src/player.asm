@@ -1,16 +1,53 @@
+    STRUCT player_state_t
+flags        BYTE 0
+subseconds_l BYTE 0
+subseconds_h BYTE 0
+seconds_l    BYTE 0
+seconds_h    BYTE 0
+minutes_l    BYTE 0
+minutes_h    BYTE 0
+    ENDS
+
+PLAYER_FLAG_TITLE_SET equ 0
+
+
+    MACRO LD_HL_SCREEN_ADDRESS _yyxx
+        lua allpass
+            _pc("ld hl, " .. screen_address_pixel((_c("_yyxx")&0xff)*8, (_c("_yyxx")>>8)*8))
+        endlua
+    ENDM
+
+
+
 ; IN  - HL - file position of first track data byte
 player_loop:
+    ld de, var_player_state        ;
+    ld b, player_state_t           ;
     xor a                          ;
-    ld (var_player_flags), a       ;
+.init_state:
+    ld (de), a                     ;
+    inc de                         ;
+    djnz .init_state               ;
     call player_reset_chip         ;
     call vis_init                  ;
+    call file_get_current_file_name;
+    call player_set_filename       ;
+    call file_get_current_file_size;
+    call player_set_size           ;
+    call smf_get_num_tracks        ;
+    call player_set_tracks         ;
+    call smf_get_ppqn              ;
+    call player_set_ppqn           ;
+    call smf_get_tempo             ;
+    call player_set_tempo          ;
 .loop:
-    push hl
-    call vis_process_frame
-    pop hl
-    xor a : out (#fe), a
-    halt
-    inc a : out (#fe), a
+    push hl ;
+    call vis_process_frame         ;
+    call player_update_timer       ;
+    pop hl                         ;
+    xor a : out (#fe), a           ;
+    halt                           ;
+    inc a : out (#fe), a           ;
     call input_process             ;
     ld a, (var_input_key)          ;
     cp INPUT_KEY_BACK              ;
@@ -76,7 +113,7 @@ player_reset_chip:
 ; OUT - HL - garbage
 ; OUT - IX - garbage
 player_set_title:
-    ld ix, var_player_flags                  ; if title already has been set - exit
+    ld ix, var_player_state.flags            ; if title already has been set - exit
     bit PLAYER_FLAG_TITLE_SET, (ix)          ; ...
     ret nz                                   ; ...
     set PLAYER_FLAG_TITLE_SET, (ix)          ; ...
@@ -113,3 +150,147 @@ player_set_title:
     ld ix, var_tmp32                         ;
     call print_stringl                       ;
     ret                                      ;
+
+
+; IN  - C  - tracks value
+; OUT - AF - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+player_set_tracks:
+    push hl                              ;
+    LD_HL_SCREEN_ADDRESS LAYOUT_TRACKS   ;
+    ld a, c                              ;
+    call print_hex                       ;
+    pop hl                               ;
+    ret                                  ;
+
+; IN  - BC - ppqn value
+; OUT - AF - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+player_set_ppqn:
+    push hl                              ;
+    push bc                              ;
+    LD_HL_SCREEN_ADDRESS LAYOUT_PPQN     ;
+    ld a, b                              ;
+    call print_hex                       ;
+    pop bc                               ;
+    ld a, c                              ;
+    call print_hex                       ;
+    pop hl                               ;
+    ret                                  ;
+
+; IN - CIX - tempo value
+; OUT - AF - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+player_set_tempo:
+    push hl                              ;
+    LD_HL_SCREEN_ADDRESS LAYOUT_TEMPO    ;
+    ld a, c                              ;
+    call print_hex                       ;
+    ld a, ixh                            ;
+    call print_hex                       ;
+    ; ld a, ixl                          ; ignore lowest byte
+    ; call print_hex                     ;
+    pop hl                               ;
+    ret                                  ;
+
+; IN  - IX - pointer to string
+; OUT - AF - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+; OUT - IX - garbage
+player_set_filename:
+    push hl                              ;
+    LD_HL_SCREEN_ADDRESS LAYOUT_FILENAME ;
+    call print_string0                   ;
+    pop hl                               ;
+    ret                                  ;
+
+; IN  - BC - size value
+; OUT - AF - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+player_set_size:
+    push hl                              ;
+    push bc                              ;
+    LD_HL_SCREEN_ADDRESS LAYOUT_SIZE     ;
+    ld a, b                              ;
+    call print_hex                       ;
+    pop bc                               ;
+    ld a, c                              ;
+    call print_hex                       ;
+    pop hl                               ;
+    ret                                  ;
+
+
+player_update_timer:
+    ld a, (var_player_state.subseconds_l)
+    inc a ; 50 hz
+    cp 5 : jr z, .subseconds_l_roll
+        ld (var_player_state.subseconds_l), a
+        ret
+.subseconds_l_roll:
+    xor a
+    ld (var_player_state.subseconds_l), a
+    LD_HL_SCREEN_ADDRESS LAYOUT_TIME_SUBSECONDS
+    ld a, (var_player_state.subseconds_h)
+    inc a
+    cp 10 : jr z, .subseconds_h_roll
+        ld (var_player_state.subseconds_h), a
+        add '0'
+        jp print_char
+.subseconds_h_roll:
+    xor a
+    ld (var_player_state.subseconds_h), a
+    add '0'
+    call print_char
+    LD_HL_SCREEN_ADDRESS LAYOUT_TIME_SECONDS+1
+    ld a, (var_player_state.seconds_l)
+    inc a
+    cp 10 : jr z, .seconds_l_roll
+        ld (var_player_state.seconds_l), a
+        add '0'
+        jp print_char
+.seconds_l_roll:
+    xor a
+    ld (var_player_state.seconds_l), a
+    add '0'
+    call print_char
+    LD_HL_SCREEN_ADDRESS LAYOUT_TIME_SECONDS+0
+    ld a, (var_player_state.seconds_h)
+    inc a
+    cp 6 : jr z, .seconds_h_roll
+        ld (var_player_state.seconds_h), a
+        add '0'
+        jp print_char
+.seconds_h_roll:
+    xor a
+    ld (var_player_state.seconds_h), a
+    add '0'
+    call print_char
+    LD_HL_SCREEN_ADDRESS LAYOUT_TIME_MINUTES+1
+    ld a, (var_player_state.minutes_l)
+    inc a
+    cp 10 : jr z, .minutes_l_roll
+        ld (var_player_state.minutes_l), a
+        add '0'
+        jp print_char
+.minutes_l_roll:
+    xor a
+    ld (var_player_state.minutes_l), a
+    add '0'
+    call print_char
+    LD_HL_SCREEN_ADDRESS LAYOUT_TIME_MINUTES+0
+    ld a, (var_player_state.minutes_h)
+    inc a
+    cp 10 : jr z, .minutes_h_roll
+        ld (var_player_state.minutes_h), a
+        add '0'
+        jp print_char
+.minutes_h_roll:
+    xor a
+    ld (var_player_state.minutes_h), a
+    add '0'
+    jp print_char

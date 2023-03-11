@@ -448,7 +448,6 @@ print_hex:
 ; IN  -  A - character to print
 ; IN  -  C - X character position [0..31]
 ; IN  -  B - Y character position [0..23]
-; IN  - DE - address of character set
 ; OUT - HL - screen address
 ; OUT - AF - garbage
 ; OUT - BC - garbage
@@ -462,7 +461,6 @@ print_char_at:
 ; Print a single character out to a screen address
 ; IN  -  A - character to print
 ; IN  - HL - screen address to print character at
-; IN  - DE - address of character set (if entering at print_char_udg)
 ; OUT - AF - garbage
 ; OUT - BC - garbage
 ; OUT - DE - garbage

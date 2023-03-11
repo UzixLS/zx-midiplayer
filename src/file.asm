@@ -115,8 +115,7 @@ file_load_catalogue:
     call trdos_exec_fun                   ; ...
     call file_catalogue_optimize          ;
     call file_catalogue_format_extensions ;
-    call file_catalogue_set_icons         ;
-    ret
+    ret                                   ;
 
 file_catalogue_optimize:          ; reorganize catalogue to skip all deleted files
     ld b, trdos_max_files         ;
@@ -172,40 +171,36 @@ file_catalogue_format_extensions:
     djnz .loop                    ;
     ret                           ;
 
-file_catalogue_set_icons:
-    ld b, trdos_max_files         ;
-    ld de, trdos_file_header_size ;
-    ld ix, file_buffer            ;
-.loop:
+
+; IN  - IX - pointer to byte after 3-char file extension string
+; OUT - A  - icon
+; OUT - F  - garbage
+file_menu_generator_get_icon:
 .check_mid_extension:
-    ld a, (ix+8)                         ; if extension is "mid" - set appropriate icon
+    ld a, (ix-3)                         ; if extension is "mid" - set appropriate icon
     cp 'm' : jr z, 1f                    ;
     cp 'M' : jr nz, .check_rmi_extension ;
-1:  ld a, (ix+9)                         ;
+1:  ld a, (ix-2)                         ;
     cp 'i' : jr z, 1f                    ;
     cp 'I' : jr nz, .check_rmi_extension ;
-1:  ld a, (ix+10)                        ;
+1:  ld a, (ix-1)                         ;
     cp 'd' : jr z, .set_icon             ;
     cp 'D' : jr z, .set_icon             ;
 .check_rmi_extension:
-    ld a, (ix+8)                         ; if extension is "rmi" - set appropriate icon
+    ld a, (ix-3)                         ; if extension is "rmi" - set appropriate icon
     cp 'r' : jr z, 1f                    ;
     cp 'R' : jr nz, .no_icon             ;
-1:  ld a, (ix+9)                         ;
+1:  ld a, (ix-2)                         ;
     cp 'm' : jr z, 1f                    ;
     cp 'M' : jr nz, .no_icon             ;
-1:  ld a, (ix+10)                        ;
+1:  ld a, (ix-1)                         ;
     cp 'i' : jr z, .set_icon             ;
     cp 'I' : jr z, .set_icon             ;
 .no_icon:
     ld a, ' '                            ; if extension isn't recognized - set empty icon (space)
-    jr .set                              ;
+    ret                                  ;
 .set_icon:
     ld a, udg_melody                     ;
-.set:
-    ld (ix+11), a                        ;
-    add ix, de                           ;
-    djnz .loop                           ;
     ret                                  ;
 
 
@@ -253,11 +248,9 @@ file_menu_generator:
     inc hl                    ;
     inc ix                    ;
     djnz .extcopy             ;
-    xor a                     ;
-.filesize:
 .icon:
+    call file_menu_generator_get_icon ; A = icon
     ld ix, file_menu_string   ;
-    ld a, (hl)                ; icon
     ld (ix), a                ;
     ld a, ' '                 ; space
     ld (ix+1), a              ;
@@ -266,8 +259,32 @@ file_menu_generator:
     ret                       ;
 
 
+; OUT - IX - pointer to 0-terminated string
+; OUT - AF - garbage
+file_get_current_file_name:
+    ld a, (var_current_file_number+0) ;
+    ld e, a                           ;
+    ld a, (var_current_file_number+1) ;
+    ld d, a                           ;
+    call file_menu_generator          ;
+    .2 inc ix                         ; skip icon
+    ret                               ;
+
+; OUT - BC - file size
+file_get_current_file_size:
+    ld a, (var_current_file_size+0)   ;
+    ld c, a                           ;
+    ld a, (var_current_file_size+1)   ;
+    ld b, a                           ;
+    ret                               ;
+
+
 ; IN  - E - file number [0..127]
 file_load:
+    xor a                                   ;
+    ld (var_current_file_number+1), a       ;
+    ld a, e                                 ;
+    ld (var_current_file_number+0), a       ;
 .select_page
     ld a, (file_pages)                      ; select first page for file
     ld bc, #7ffd                            ; ...
@@ -279,6 +296,10 @@ file_load:
     sla e : rl d                            ; ...
     ld ix, file_buffer                      ; IX = file_buffer + entry_number * 16
     add ix, de                              ; ...
+    ld a, (ix+#b)                           ; file size in bytes
+    ld (var_current_file_size+0), a         ; ...
+    ld a, (ix+#c)                           ; ...
+    ld (var_current_file_size+1), a         ; ...
     ld b, (ix+#d)                           ; sectors count
     ld e, (ix+#e)                           ; sector n
     ld d, (ix+#f)                           ; track n
