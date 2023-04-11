@@ -4,6 +4,8 @@
     DEVICE ZXSPECTRUM128,stack_top
 
     includelua "lua/screen_address.lua"
+    include "config.inc"
+    include "layout.inc"
 
     page 0
     org int_handler-(variables0_end-variables0)
@@ -61,15 +63,31 @@ main:
 
 
 play_file:
-    ld ix, file_base_addr     ;
-    call smf_parse            ;
-    ret nz                    ;
-    call load_screen1         ;
-    call player_loop          ;
-    call load_screen0         ;
-    ld iy, file_menu          ;
-    call menu_draw            ;
-    ret                       ;
+    ld ix, file_base_addr            ;
+    call smf_parse                   ;
+    ret nz                           ;
+    call load_screen1                ;
+    call player_loop                 ;
+    call load_screen0                ;
+    ld iy, file_menu                 ;
+    call menu_draw                   ;
+    ld a, (var_player_nextfile_flag) ; if nextfile flag is set - load next file
+    dec a                            ; ...
+    ret nz                           ; ... or exit if isn't set
+.load_next_file:
+    ld (var_player_nextfile_flag), a ; reset nextfile flag
+    ld b, LOAD_NEXT_FILE_DELAY       ; just cosmetic delay
+1:  ei : halt                        ; ...
+    djnz 1b                          ; ...
+    ld a, INPUT_KEY_DOWN             ; move cursor down
+    call input_simulate_keypress     ; ...
+    call menu_handle_input           ; ...
+    ld b, LOAD_NEXT_FILE_DELAY       ; just cosmetic delay
+1:  ei : halt                        ; ...
+    djnz 1b                          ; ...
+    ld a, INPUT_KEY_ACT              ; load file
+    call input_simulate_keypress     ; ...
+    jp menu_handle_input             ; ...
 
 
 ; IN  - DE - entry number (assume < 128)
@@ -79,9 +97,6 @@ file_menu_callback:
     call play_file
     pop de
     ret
-
-    include "config.inc"
-    include "layout.inc"
 
     include "input.asm"
     include "menu.asm"

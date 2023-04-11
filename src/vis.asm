@@ -17,13 +17,10 @@ vis_piano_key_addresses:
             n = key % 12
             if n==1 or n==3 or n==6 or n==8 or n==10 then
                 y_offset = _c("LAYOUT_PIANO_KEYS_Y_BLACK")
-            else
-                y_offset = 0;
-            end
-            if n==0 or n==2 or n==4 or n==5 or n==7 or n==9 or n==11 then
-                x_append = 8
-            else
                 x_append = 0
+            else
+                y_offset = 0
+                x_append = 8
             end
             address = screen_address_pixel(x, y + y_offset)
             if y_offset ~= 0 then
@@ -198,7 +195,6 @@ vis_process_frame:
     call get_pixel_address                       ;
     xor a                                        ;
     ld (hl), a                                   ;
-    nop
 .next_chan:
     dec e                                        ;
     jp p, .loop_next_chan                        ;

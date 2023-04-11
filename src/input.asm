@@ -184,6 +184,13 @@ input_process:
     ret                               ;
 
 
+; IN - A - key
+input_simulate_keypress:
+    ld (var_input_key), a           ;
+    ld (var_input_key_last), a      ;
+    ret                             ;
+
+
 ; OUT - AF - garbage
 input_detect_kempston:
     ei : halt                       ; avoid collision with attribute port

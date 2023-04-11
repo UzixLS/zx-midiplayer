@@ -41,7 +41,7 @@ player_loop:
     call smf_get_tempo             ;
     call player_set_tempo          ;
 .loop:
-    push hl ;
+    push hl                        ;
     call vis_process_frame         ;
     call player_update_timer       ;
     pop hl                         ;
@@ -52,9 +52,11 @@ player_loop:
     ld a, (var_input_key)          ;
     cp INPUT_KEY_BACK              ;
     jr z, .end                     ;
+    cp INPUT_KEY_ACT               ;
+    jr z, .load_next_file          ;
 .process_tracks:
     call smf_get_first_track       ;
-    jr z, .end                     ;
+    jr z, .load_next_file          ;
 .process_current_track:
     call smf_process_track         ; A = status, HL = track position, BC = data len
     jp c, .next_track              ; if C == 1 (delayed) then go to the next track
@@ -65,9 +67,9 @@ player_loop:
     call smf_handle_meta           ; ... instead, process it locally. HL = next track position
     jp .process_current_track      ; ...
 .vis:
-    push bc
-    call vis_process_command
-    pop bc
+    push bc                        ;
+    call vis_process_command       ;
+    pop bc                         ;
 .status_send:
     ld ixh, b : ld ixl, c          ; IX = data len
     di : call uart_putc : ei       ; send status
@@ -83,6 +85,9 @@ player_loop:
     call smf_get_next_track        ;
     jr z, .loop                    ;
     jp .process_current_track      ;
+.load_next_file:
+    ld a, 1                          ;
+    ld (var_player_nextfile_flag), a ;
 .end:
     ; jp player_reset_chip           ;
 

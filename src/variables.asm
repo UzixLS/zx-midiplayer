@@ -26,6 +26,7 @@ var_smf_file smf_file_t
 var_tmp32 BLOCK 32
 
 var_player_state player_state_t
+var_player_nextfile_flag BYTE 0
 
 var_vis_state vis_state_t
 
