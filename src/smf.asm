@@ -28,7 +28,7 @@ num_tracks        BYTE
 ppqn              WORD
 tempo             DWORD
 tick_duration     WORD
-tracks            BLOCK max_tracks*smf_track_t
+tracks            BLOCK SMF_MAX_TRACKS*smf_track_t
 _zerobyte         BYTE 0   ; this is read by smf_get_next_track and written by smf_parse (flags=0)
     ENDS
 
@@ -47,7 +47,6 @@ SMF_TRACK_FLAGS_PLAY   = 1
 SMF_TRACK_FLAGS_DELAY  = 2
 
 default_tempo = 500000     ; defined by MIDI standard
-max_tracks = 40
 
 
 ; IN  - HL - position of beginning of file
@@ -92,7 +91,7 @@ smf_parse_file_header:
     or 1 : cp 1 : ret nz                                       ; if (format != 0 && format != 1) - return error
     call file_get_next_byte : cp 0   : ret nz                  ; chunk_mthd_t.num_tracks[0]
     call file_get_next_byte : ld (var_smf_file.num_tracks), a  ; chunk_mthd_t.num_tracks[1]
-    cp max_tracks                                              ; if (num_tracks>max_tracks) - return error
+    cp SMF_MAX_TRACKS                                          ; if (num_tracks>SMF_MAX_TRACKS) - return error
     jp c, 1f : jp z, 1f                                        ; ...
     or 1                                                       ; reset Z flag
     ret                                                        ; ...
