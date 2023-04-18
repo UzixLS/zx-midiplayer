@@ -24,12 +24,13 @@ data          BLOCK 0
     ENDS
 
     STRUCT smf_file_t
-num_tracks        BYTE
-ppqn              WORD
-tempo             DWORD
-tick_duration     WORD
-tracks            BLOCK SMF_MAX_TRACKS*smf_track_t
-_zerobyte         BYTE 0   ; this is read by smf_get_next_track and written by smf_parse (flags=0)
+num_tracks         BYTE
+ppqn               WORD
+tempo              DWORD
+tick_duration      WORD
+tick_duration_last WORD
+tracks             BLOCK SMF_MAX_TRACKS*smf_track_t
+_zerobyte          BYTE 0   ; this is read by smf_get_next_track and written by smf_parse (flags=0)
     ENDS
 
     STRUCT smf_track_t
@@ -212,10 +213,9 @@ smf_get_next_track:
 .next_track:
     add iy, bc                        ; IY += sizeof(smf_track_t)
     ld a, (iy+smf_track_t.flags)      ; if (!track_valid) return Z=1
-    and 1<<SMF_TRACK_FLAGS_VALID      ; ...
+    bit SMF_TRACK_FLAGS_VALID, a      ; ...
     ret z                             ; ...
-    ld a, (iy+smf_track_t.flags)      ; if (!track_play) check next track
-    and 1<<SMF_TRACK_FLAGS_PLAY       ; ...
+    bit SMF_TRACK_FLAGS_PLAY, a       ; if (!track_play) check next track
     jr z, .next_track                 ; ...
     ld l, (iy+smf_track_t.position+0) ; HL = IY->track_position
     ld h, (iy+smf_track_t.position+1) ; ...
@@ -256,6 +256,53 @@ smf_parse_varint:
     or c                      ;
     ld c, a                   ;
     jp .loop                  ;
+
+
+; OUT - AF   - garbage
+; OUT - BC   - garbage
+; OUT - DE   - garbage
+; OUT - HL   - garbage
+; OUT - IX   - garbage
+smf_recalculate_remaining_delay:
+.calc_elapsed_counter:
+    ld hl, (var_int_counter)                   ;
+    ld c, (iy+smf_track_t.int_acked_counter+0) ; BC = acked_counter
+    ld b, (iy+smf_track_t.int_acked_counter+1) ; ...
+    xor a                                      ; HL = elapsed_counter = int_counter - acked_counter
+    sbc hl, bc                                 ; ...
+.get_wait_duration:
+    ld e, (iy+smf_track_t.wait_duration+0)     ; BCDE = wait_duration[31:0]
+    ld d, (iy+smf_track_t.wait_duration+1)     ; ...
+    ld c, (iy+smf_track_t.wait_duration+2)     ; ...
+    ld b, (iy+smf_track_t.wait_duration+3)     ; ...
+    srl b                                      ; wait_duration[31:0] = {0,wait_duration[31:16],wait_duration[14:0]}
+    rr c                                       ; ... see smf_set_delay for details
+    jr nc, .calc_left_wait_duration            ; ...
+    set 7, d                                   ; ...
+.calc_left_wait_duration:
+    xor a                                      ; ACIX = BCDE - HL
+    ex de, hl                                  ; ...
+    sbc hl, de                                 ; ...
+    ex de, hl                                  ; ...
+    ld ixl, e : ld ixh, d                      ; ...
+    ld a, c                                    ; ...
+    sbc a, 0                                   ; ...
+    ld c, a                                    ; ...
+    ld a, b                                    ; ...
+    sbc a, 0                                   ; ...
+    ret c                                      ; ... wait is expired
+.calc_new_wait_duration:
+    ld de, (var_smf_file.tick_duration_last)   ; DE = tick_duration
+    call div32by16                             ; ACIX = left_ticks_count = left_wait_duration (ACIX) / tick_duration (DE), HL = remainder
+    ex de, hl                                  ; acked_counter = int_counter - remainder
+    ld hl, (var_int_counter)                   ; ...
+    or a                                       ; ...
+    sbc hl, de                                 ; ...
+    ld (iy+smf_track_t.int_acked_counter+0), l ; ...
+    ld (iy+smf_track_t.int_acked_counter+1), h ; ...
+    ld d, a : ld e, c : ld b, ixh : ld c, ixl  ; set new wait_duration
+    call smf_set_delay                         ; ...
+    ret                                        ;
 
 
 ; IN  - IY - pointer to smf_track_t
@@ -345,31 +392,6 @@ smf_set_delay:
 
 ; IN  - HL - track position
 ; IN  - IY - pointer to smf_track_t
-; OUT - HL - next track position
-; OUT - AF - garbage
-; OUT - BC - garbage
-; OUT - DE - garbage
-smf_get_next_delay:
-    call smf_parse_varint                     ; DEBC = time delta
-    ld a, b                                   ; if (delay == 0) then wait_duration = 0
-    or c                                      ; ...
-    or d                                      ; ...
-    or e                                      ; ...
-    jp nz, .time_delta_non_zero               ; ...
-    ld (iy+smf_track_t.wait_duration+0), c    ; ... wait_duration = 0
-    ld (iy+smf_track_t.wait_duration+1), b    ; ...
-    ld (iy+smf_track_t.wait_duration+2), e    ; ...
-    ld (iy+smf_track_t.wait_duration+3), d    ; ...
-    ret                                       ;
-.time_delta_non_zero:
-    push hl                                   ;
-    call smf_set_delay                        ; ... else - calculate and save wait_duration
-    pop hl                                    ;
-    ret                                       ;
-
-
-; IN  - HL - track position
-; IN  - IY - pointer to smf_track_t
 ; OUT -  A - status byte
 ; OUT - BC - data len
 ; OUT - HL - next track position
@@ -450,10 +472,11 @@ smf_process_track:
     jr z, .end_of_file                                ; ...
     jr c, .end_of_file                                ; ...
 .get_delay:
-    call smf_get_next_delay                           ;
-    bit SMF_TRACK_FLAGS_DELAY, (iy+smf_track_t.flags) ; if no delay - get status
-    jr z, .get_status                                 ; ...
+    call smf_parse_varint                             ; DEBC = time delta (ticks count)
+    ld a, b : or c : or d : or e                      ; check if delay == 0
+    jp z, .get_status                                 ; ... if yes - process status command
     push hl                                           ;
+    call smf_set_delay                                ; else - calculate and save wait_duration
     call smf_check_delay                              ; check if delay has been completed prematurely
     pop hl                                            ;
     ret c                                             ; ... exit if no
@@ -469,11 +492,11 @@ smf_process_track:
 
 ; TODO: SMPTE; negative 'division' field value
 
-; OUT - IX - tick duration
+; OUT - HL - tick duration
 ; OUT - AF - garbage
 ; OUT - BC - garbage
 ; OUT - DE - garbage
-; OUT - HL - garbage
+; OUT - IX - garbage
 smf_update_tick_duration:                     ; tick_duration = tempo / ppqn / machine_constant, where machine_constant = (1000 * int_len_ms / 256)
     ld a, (var_smf_file.tempo+2)              ; ACIX = tempo
     ld c, a                                   ; ...
@@ -495,11 +518,28 @@ smf_update_tick_duration:                     ; tick_duration = tempo / ppqn / m
 1:  xor a                                     ; ACIX = tempo / ppqn / machine_constant
     call div32by16                            ; ...
     or c                                      ; if (ACIX > 0xFFFF) ACIX = 0xFFFF
-    jp z, .save                               ; ...
+    jp z, 1f                                  ; ...
     ld ix, #ffff                              ; ...
-.save:
-    ld (var_smf_file.tick_duration), ix       ;
+1:  ld (var_smf_file.tick_duration), ix       ;
+    push iy                                   ;
+    call smf_update_wait_durations            ;
+    pop iy                                    ;
+    ld hl, (var_smf_file.tick_duration)       ;
+    ld (var_smf_file.tick_duration_last), hl  ;
     ret                                       ;
+
+smf_update_wait_durations:
+    ld iy, var_smf_file.tracks-smf_track_t     ;
+.next_track:
+    ld bc, smf_track_t                         ;
+    add iy, bc                                 ; IY += sizeof(smf_track_t)
+    ld a, (iy+smf_track_t.flags)               ; if (!track_valid) return Z=1
+    bit SMF_TRACK_FLAGS_VALID, a               ; ...
+    ret z                                      ; ...
+    bit SMF_TRACK_FLAGS_DELAY, a               ; if (no delay at track) check next track
+    jr z, .next_track                          ; ...
+    call smf_recalculate_remaining_delay       ; recalculate delay with new tempo
+    jp .next_track                             ;
 
 
 ; IN  - BC - data len
