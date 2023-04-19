@@ -7,6 +7,12 @@
     include "config.inc"
     include "layout.inc"
 
+    MACRO LD_SCREEN_ADDRESS _reg, _yyxx
+        lua allpass
+            _pc("ld _reg, " .. screen_address_pixel((_c("_yyxx")&0xff)*8, (_c("_yyxx")>>8)*8))
+        endlua
+    ENDM
+
     page 0
     org int_handler-(variables0_end-variables0)
     assert $ >= #6000
@@ -51,7 +57,7 @@ main:
     call input_detect_kempston      ;
     call play_file                  ; file may be already loaded in ram
     call file_load_catalogue        ;
-    call load_screen0               ;
+    call screen_select_files        ;
     ld iy, file_menu                ;
     call menu_first_draw            ;
 .loop:
@@ -66,9 +72,9 @@ play_file:
     ld ix, file_base_addr            ;
     call smf_parse                   ;
     ret nz                           ;
-    call load_screen1                ;
+    call screen_select_player        ;
     call player_loop                 ;
-    call load_screen0                ;
+    call screen_select_files         ;
     ld iy, file_menu                 ;
     call menu_draw                   ;
     ld a, (var_player_nextfile_flag) ; if nextfile flag is set - load next file
@@ -119,8 +125,8 @@ file_menu: menu_t file_menu_generator 0 file_menu_callback LAYOUT_FILEMENU_X LAY
 
 
 buildversion:
-    ifdef VERSION
-    db VERSION, 0
+    ifdef VERSION_DEF
+    db VERSION_DEF, 0
     else
     db 0
     endif

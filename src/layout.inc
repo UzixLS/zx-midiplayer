@@ -11,9 +11,9 @@ LAYOUT_TIME_SECONDS            equ #051b
 LAYOUT_TIME_SUBSECONDS         equ #051e
 LAYOUT_CURSOR_ATTR             equ #38
 LAYOUT_BG_ATTR                 equ #46
-LAYOUT_FILEMENU_X              equ 1
-LAYOUT_FILEMENU_Y              equ 1
-LAYOUT_FILEMENU_LINES          equ 22
+LAYOUT_FILEMENU_X              equ 2
+LAYOUT_FILEMENU_Y              equ 17
+LAYOUT_FILEMENU_LINES          equ 20
 LAYOUT_FILEMENU_COLUMNS        equ 14
 LAYOUT_BARS_X                  equ 64
 LAYOUT_BARS_Y                  equ 64
@@ -31,3 +31,7 @@ LAYOUT_PIANO_KEYS_WHITE_OFF    equ %11011111
 LAYOUT_PIANO_KEYS_BLACK_ON     equ %01110111
 LAYOUT_PIANO_KEYS_BLACK_OFF    equ %00000111
 LAYOUT_PIANO_KEYS_ON_LINES     equ 3
+LAYOUT_INFO_VERSION            equ #1601
+LAYOUT_INFO_FREQ               equ #1401
+LAYOUT_INFO_INT                equ #140a
+LAYOUT_HEAD                    equ #0000

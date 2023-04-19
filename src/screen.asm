@@ -11,7 +11,7 @@ screen1_page equ 7
     export screen1_page
 
 
-load_screen0:
+screen_select_files:
     ld a, #10 + screen0_page
     ld bc, #7ffd
     out (c), a
@@ -22,9 +22,30 @@ load_screen0:
     ld a, #10
     ld bc, #7ffd
     out (c), a
-    ret
+.print:
+    LD_SCREEN_ADDRESS hl, LAYOUT_HEAD         ;
+    ld ix, str_head                           ;
+    call print_string0                        ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_INFO_VERSION ;
+    ld ix, buildversion                       ;
+    call print_string0                        ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_INFO_FREQ    ;
+    ld a, (var_cpu_freq)                      ;
+    cp CPU_FREQ_3_5_MHZ  : jr nz, 1f : ld ix, str_3_5_mhz  : jr 2f ;
+1:  cp CPU_FREQ_3_54_MHZ : jr nz, 1f : ld ix, str_3_54_mhz : jr 2f ;
+1:  cp CPU_FREQ_7_MHZ    : jr nz, 1f : ld ix, str_7_mhz    : jr 2f ;
+1:  cp CPU_FREQ_14_MHZ   : jr nz, 1f : ld ix, str_14_mhz   : jr 2f ;
+1:  cp CPU_FREQ_28_MHZ   : jr nz, 3f : ld ix, str_28_mhz   : jr 2f ;
+2:  call print_string0                        ;
+3:  inc hl                                    ;
+    ld a, (var_int_type)                      ;
+    cp INT_50_HZ   : jr nz, 1f : ld ix, str_50_hz : jr 2f ;
+1:  cp INT_48_8_HZ : jr nz, 3f : ld ix, str_48_hz : jr 2f ;
+2:  call print_string0                        ;
+3:  ret                                       ;
 
-load_screen1:
+
+screen_select_player:
     ld a, #10 + screen1_page
     ld bc, #7ffd
     out (c), a
@@ -35,4 +56,8 @@ load_screen1:
     ld a, #10
     ld bc, #7ffd
     out (c), a
-    ret
+.print:
+    LD_SCREEN_ADDRESS hl, LAYOUT_HEAD         ;
+    ld ix, str_head                           ;
+    call print_string0                        ;
+    ret                                       ;

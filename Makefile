@@ -1,10 +1,10 @@
 ifneq ($(wildcard .git),)
-	VERSION := $(shell git describe --abbrev=6 --long --dirty --always --tags --first-parent | sed s/-/./)
+	VERSION := $(shell git describe --abbrev=6 --long --dirty="D" --always --tags --first-parent | sed s/-/./)
 endif
 
 export PATH:=/cygdrive/c/Hwdev/sjasmplus/:/cygdrive/e/Emulation/ZX Spectrum/Emuls/Es.Pectrum/:${PATH}
 
-SJOPTS = --nologo --fullpath --outprefix=build/ -DVERSION=\"${VERSION}\"
+SJOPTS = --nologo --fullpath --outprefix=build/ -DVERSION_DEF=\"${VERSION}\"
 
 .PHONY: all clean run
 

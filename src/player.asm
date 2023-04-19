@@ -11,13 +11,6 @@ minutes_h    BYTE 0
 PLAYER_FLAG_TITLE_SET equ 0
 
 
-    MACRO LD_HL_SCREEN_ADDRESS _yyxx
-        lua allpass
-            _pc("ld hl, " .. screen_address_pixel((_c("_yyxx")&0xff)*8, (_c("_yyxx")>>8)*8))
-        endlua
-    ENDM
-
-
 
 ; IN  - HL - file position of first track data byte
 player_loop:
@@ -163,7 +156,7 @@ player_set_title:
 ; OUT - DE - garbage
 player_set_tracks:
     push hl                              ;
-    LD_HL_SCREEN_ADDRESS LAYOUT_TRACKS   ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_TRACKS  ;
     ld a, c                              ;
     call print_hex                       ;
     pop hl                               ;
@@ -176,7 +169,7 @@ player_set_tracks:
 player_set_ppqn:
     push hl                              ;
     push bc                              ;
-    LD_HL_SCREEN_ADDRESS LAYOUT_PPQN     ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_PPQN    ;
     ld a, b                              ;
     call print_hex                       ;
     pop bc                               ;
@@ -191,7 +184,7 @@ player_set_ppqn:
 ; OUT - DE - garbage
 player_set_tempo:
     push hl                              ;
-    LD_HL_SCREEN_ADDRESS LAYOUT_TEMPO    ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_TEMPO   ;
     ld a, c                              ;
     call print_hex                       ;
     ld a, ixh                            ;
@@ -208,7 +201,7 @@ player_set_tempo:
 ; OUT - IX - garbage
 player_set_filename:
     push hl                              ;
-    LD_HL_SCREEN_ADDRESS LAYOUT_FILENAME ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_FILENAME;
     call print_string0                   ;
     pop hl                               ;
     ret                                  ;
@@ -220,7 +213,7 @@ player_set_filename:
 player_set_size:
     push hl                              ;
     push bc                              ;
-    LD_HL_SCREEN_ADDRESS LAYOUT_SIZE     ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_SIZE    ;
     ld a, b                              ;
     call print_hex                       ;
     pop bc                               ;
@@ -239,7 +232,7 @@ player_update_timer:
 .subseconds_l_roll:
     xor a
     ld (var_player_state.subseconds_l), a
-    LD_HL_SCREEN_ADDRESS LAYOUT_TIME_SUBSECONDS
+    LD_SCREEN_ADDRESS hl, LAYOUT_TIME_SUBSECONDS
     ld a, (var_player_state.subseconds_h)
     inc a
     cp 10 : jr z, .subseconds_h_roll
@@ -251,7 +244,7 @@ player_update_timer:
     ld (var_player_state.subseconds_h), a
     add '0'
     call print_char
-    LD_HL_SCREEN_ADDRESS LAYOUT_TIME_SECONDS+1
+    LD_SCREEN_ADDRESS hl, LAYOUT_TIME_SECONDS+1
     ld a, (var_player_state.seconds_l)
     inc a
     cp 10 : jr z, .seconds_l_roll
@@ -263,7 +256,7 @@ player_update_timer:
     ld (var_player_state.seconds_l), a
     add '0'
     call print_char
-    LD_HL_SCREEN_ADDRESS LAYOUT_TIME_SECONDS+0
+    LD_SCREEN_ADDRESS hl, LAYOUT_TIME_SECONDS+0
     ld a, (var_player_state.seconds_h)
     inc a
     cp 6 : jr z, .seconds_h_roll
@@ -275,7 +268,7 @@ player_update_timer:
     ld (var_player_state.seconds_h), a
     add '0'
     call print_char
-    LD_HL_SCREEN_ADDRESS LAYOUT_TIME_MINUTES+1
+    LD_SCREEN_ADDRESS hl, LAYOUT_TIME_MINUTES+1
     ld a, (var_player_state.minutes_l)
     inc a
     cp 10 : jr z, .minutes_l_roll
@@ -287,7 +280,7 @@ player_update_timer:
     ld (var_player_state.minutes_l), a
     add '0'
     call print_char
-    LD_HL_SCREEN_ADDRESS LAYOUT_TIME_MINUTES+0
+    LD_SCREEN_ADDRESS hl, LAYOUT_TIME_MINUTES+0
     ld a, (var_player_state.minutes_h)
     inc a
     cp 10 : jr z, .minutes_h_roll

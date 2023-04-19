@@ -19,7 +19,8 @@ This is standard MIDI wiring method defined by ZX Spectrum 128.
 You may use addon with builtin MIDI synthesizer or connect an external one to your Spectrum - see [link](https://www.benophetinternet.nl/hobby/vanmezelf/ZX_Spectrum_Midi_Out.pdf) for howto.
 
 ## TODO
-- Redesign file selector
+- Add help
+- Add scrollbars or entry counter to menus
 - Implement floppy drive changing
 - Print messages at boot
 - Redesign boot logo
