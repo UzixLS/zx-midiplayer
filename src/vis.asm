@@ -3,6 +3,7 @@
 
     STRUCT vis_state_t
 _zerobyte   BYTE 0              ; used in vis_init
+logo_step   BYTE 0              ;
 bar_current BLOCK LAYOUT_BARS_N ;
 bar_diff    BLOCK LAYOUT_BARS_N ;
     ENDS
@@ -137,6 +138,7 @@ vis_process_command:
 ; OUT - HL  - garbage
 ; OUT - IXL - garbage
 vis_process_frame:
+.bars_animation:
     ld de, LAYOUT_BARS_N-1                       ;
 .loop_next_chan:
     ld hl, var_vis_state+vis_state_t.bar_diff    ;
@@ -198,7 +200,38 @@ vis_process_frame:
 .next_chan:
     dec e                                        ;
     jp p, .loop_next_chan                        ;
+.logo_animation:                                 ;
+    ld a, (var_vis_state+vis_state_t.logo_step)  ;
+    dec a                                        ;
+    ld (var_vis_state+vis_state_t.logo_step), a  ;
+    srl a                                        ;
+    ret nc                                       ;
+    cp #7f                                       ;
+    jr z, .clear_first_line                      ;
+    cp LAYOUT_LOGO_LINES                         ;
+    ret nc                                       ;
+    LD_ATTR_ADDRESS hl, LAYOUT_LOGO              ; HL = address of top-left attribute byte
+    ld b, 0                                      ; HL += line
+    rlca : rlca : rlca : rla : rl b : rla : rl b ; ...
+    ld c, a                                      ; ...
+    add hl, bc                                   ; ...
+.draw_line:
+    ld a, LAYOUT_LOGO_FLASH_ATTR                 ;
+    DUP LAYOUT_LOGO_COLUMNS
+    ld (hl), a                                   ;
+    inc l                                        ;
+    EDUP
+    call char_address_down                       ;
+.clear_line:
+    ld a, LAYOUT_LOGO_NORMAL_ATTR                ;
+    DUP LAYOUT_LOGO_COLUMNS
+    dec l                                        ;
+    ld (hl), a                                   ;
+    EDUP
     ret                                          ;
+.clear_first_line:
+    LD_ATTR_ADDRESS hl, LAYOUT_LOGO + LAYOUT_LOGO_COLUMNS ;
+    jp .clear_line                                        ;
 
 
 vis_init:

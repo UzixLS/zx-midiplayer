@@ -22,6 +22,5 @@ You may use addon with builtin MIDI synthesizer or connect an external one to yo
 - Add help
 - Add scrollbars or entry counter to menus
 - Implement floppy drive changing
-- Add something to unused space at player screen
 - Implement FAT32 support
 - Implement DivMMC, ZXMMC and Z-Controller support

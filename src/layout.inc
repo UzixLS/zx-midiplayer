@@ -35,3 +35,8 @@ LAYOUT_INFO_VERSION            equ #1601
 LAYOUT_INFO_FREQ               equ #1401
 LAYOUT_INFO_INT                equ #140a
 LAYOUT_HEAD                    equ #0000
+LAYOUT_LOGO                    equ #081b
+LAYOUT_LOGO_LINES              equ 8
+LAYOUT_LOGO_COLUMNS            equ 3
+LAYOUT_LOGO_NORMAL_ATTR        equ #06
+LAYOUT_LOGO_FLASH_ATTR         equ #42
