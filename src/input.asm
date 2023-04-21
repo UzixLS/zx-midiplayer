@@ -153,7 +153,7 @@ input_beep:
 input_process:
 .A: call input_read                   ; read keys. Self modifying code! see input_detect_kempston
     ld a, (var_input_key_last)        ;
-    cp b                              ; if (current_pressed_key == last_pressed_key) {input_key = current_pressed_key; timer = X}
+    cp b                              ; if (current_pressed_key != last_pressed_key) {input_key = current_pressed_key; timer = X}
     jr nz, .new_key_event             ; ...
     or a                              ; exit if no key pressed
     ret z                             ; ...

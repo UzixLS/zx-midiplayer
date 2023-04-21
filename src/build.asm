@@ -10,7 +10,7 @@
 ; === SNA file ===
     lua allpass
         incbin_pages("res/start.scr",  0, nil, 0x4000, {0})
-        incbin_pages("res/files.scr",  0, nil, 0xC000, {7})
+        incbin_pages("res/menu.scr",   0, nil, 0xC000, {7})
         incbin_pages("res/play.scr",   0, nil, 0xC000+6912, {7})
         incbin_pages("build/main.bin", 0, nil, _c("begin"), {0})
         incbin_pages("res/test0.mid",  0, nil, 0xC000, {0,4,6,3})
@@ -38,7 +38,7 @@ boot_b:
     call .sub_unpack                  ;
     xor a                             ; set black border
     out (#fe), a                      ; ...
-    ld a, #10 + screen0_page          ; screen_files
+    ld a, #10 + screen0_page          ; screen_menu
     ld bc, #7ffd                      ;
     out (c), a                        ;
     ld de, screen0                    ;
@@ -96,7 +96,7 @@ boot_b:
     org 0
     lua allpass
         incbin_rle("res/start.scr")
-        incbin_rle("res/files.scr")
+        incbin_rle("res/menu.scr")
         incbin_rle("res/play.scr")
         sj.insert_label("screen_sectors", math.ceil(sj.current_address/256))
     endlua

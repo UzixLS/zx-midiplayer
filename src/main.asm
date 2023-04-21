@@ -52,36 +52,73 @@ main:
     ld a, high int_im2_vector_table ; set IM2 interrupt table address (#8000-#8100)
     ld i, a                         ; ...
     im 2                            ; ...
-    xor a                           ; set black border
-    out (#fe), a                    ; ...
     ld a, #10                       ; page BASIC48
     ld bc, #7ffd                    ; ...
     out (c), a                      ; ...
     call device_detect_cpu_int      ;
     call uart_init                  ;
     call input_detect_kempston      ;
+    ld iy, main_menu                ;
+    call menu_init                  ;
+    ld iy, file_menu                ;
+    call menu_init                  ;
+    call screen_select_menu         ;
     call play_file                  ; file may be already loaded in ram
-    call file_load_catalogue        ;
-    call screen_select_files        ;
-    ld iy, file_menu                ;
-    call menu_first_draw            ;
+    xor a                           ; set black border
+    out (#fe), a                    ; ...
 .loop:
-    ei : halt
+    ei : halt                       ;
     call input_process              ;
-    ld iy, file_menu                ;
+    ld a, (var_input_key)           ;
+    cp INPUT_KEY_BACK               ;
+    call z, menu_main_file_toggle   ;
+    ld iy, (var_current_menu_ptr)   ;
     call menu_handle_input          ;
     jp .loop                        ;
+
+
+exit:
+    xor a        ; page BASIC128
+    ld bc, #7ffd ; ...
+    out (c), a   ; ...
+    out (#fe), a ;
+    jp 0         ;
+
+
+
+menu_main_file_toggle:
+    ld a, (var_current_menu)      ;
+    xor 1                         ;
+    ld (var_current_menu), a      ;
+
+menu_main_file_set_style:
+    ld a, (var_current_menu)      ;
+    or a                          ;
+    jp nz, .select_file_menu      ;
+.select_main_menu:
+    ld iy, file_menu              ;
+    call menu_style_inactive      ;
+    ld iy, main_menu              ;
+    ld (var_current_menu_ptr), iy ;
+    jp menu_style_active          ;
+.select_file_menu:
+    ld iy, main_menu              ;
+    call menu_style_inactive      ;
+    ld iy, file_menu              ;
+    ld (var_current_menu_ptr), iy ;
+    jp menu_style_active          ;
 
 
 play_file:
     ld ix, file_base_addr            ;
     call smf_parse                   ;
-    ret nz                           ;
-    call screen_select_player        ;
+    jr z, 1f                         ;
+    ld a, LAYOYT_ERR_FE              ;
+    out (#fe), a                     ;
+    ret                              ;
+1:  call screen_select_player        ;
     call player_loop                 ;
-    call screen_select_files         ;
-    ld iy, file_menu                 ;
-    call menu_draw                   ;
+    call screen_select_menu          ;
     ld a, (var_player_nextfile_flag) ; if nextfile flag is set - load next file
     dec a                            ; ...
     ret nz                           ; ... or exit if isn't set
@@ -103,11 +140,65 @@ play_file:
 
 ; IN  - DE - entry number (assume < 128)
 file_menu_callback:
-    push de
-    call file_load
-    call play_file
-    pop de
-    ret
+    call file_load      ;
+    jp z, play_file     ; Z=0 - ok
+    ld a, LAYOYT_ERR_FE ;
+    out (#fe), a        ;
+    ret                 ;
+
+
+; IN  - DE - entry number
+main_menu_callback:
+    ld a, e                     ;
+.bdi_drive:
+    cp 3+1                      ;
+    jr nc, .exit                ;
+    ld (var_current_drive), a   ;
+    call file_load_catalogue    ;
+    ld iy, file_menu            ;
+    call menu_init              ;
+    call menu_draw              ;
+    call menu_main_file_toggle  ;
+.exit:
+    cp 5                        ;
+    jr nz, .unhandled_menu_item ;
+    jp exit                     ;
+.unhandled_menu_item:
+    ret                         ;
+
+
+; IN  - DE - entry number
+; OUT -  F - NZ when ok, Z when not ok
+; OUT - IX - pointer to 0-terminated string
+main_menu_generator:
+    ld hl, .entries_count-1 ; exit if DE >= entries_count
+    xor a                   ; ...
+    sbc hl, de              ; ...
+    jp nc, 1f               ; ...
+    xor a                   ; ... Z=1
+    ret                     ; ...
+1:  push de                 ;
+    ld ix, .entries         ;
+    sla e : rl d            ;
+    add ix, de              ;
+    ld e, (ix+0)            ;
+    ld d, (ix+1)            ;
+    ld ixl, e : ld ixh, d   ;
+    pop de                  ;
+    or 1                    ; Z=0
+    ret                     ;
+.entries:
+    DW str_drive_a
+    DW str_drive_b
+    DW str_drive_c
+    DW str_drive_d
+    ; DW str_divmmc
+    ; DW str_zxmmc
+    ; DW str_zcontroller
+    DW str_help
+    DW str_exit
+.entries_count = ($-.entries)/2
+
 
     include "input.asm"
     include "menu.asm"
@@ -126,7 +217,8 @@ file_menu_callback:
 
     include "variables.asm"
 
-file_menu: menu_t file_menu_generator 0 file_menu_callback LAYOUT_FILEMENU_X LAYOUT_FILEMENU_Y LAYOUT_FILEMENU_LINES LAYOUT_FILEMENU_COLUMNS
+file_menu: menu_t file_menu_generator 0 file_menu_callback LAYOUT_FILEMENU_Y LAYOUT_FILEMENU_X LAYOUT_FILEMENU_LINES LAYOUT_FILEMENU_COLUMNS
+main_menu: menu_t main_menu_generator 0 main_menu_callback LAYOUT_MAINMENU_Y LAYOUT_MAINMENU_X LAYOUT_MAINMENU_LINES LAYOUT_MAINMENU_COLUMNS
 
 
 buildversion:

@@ -96,7 +96,7 @@ clear_screen_area:
 ; IN  -  L - X character position [0..31]
 ; IN  -  B - width
 ; IN  -  C - height
-; OUT -  F - garbage
+; OUT - AF - garbage
 ; OUT - DE - garbage
 ; OUT - HL - garbage
 fill_attr_at:

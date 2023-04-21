@@ -1,3 +1,4 @@
+LAYOYT_ERR_FE                  equ #02
 LAYOUT_DEBUG                   equ #0201
 LAYOUT_TITLE                   equ #0301
 LAYOUT_TITLE_LEN               equ 30
@@ -10,9 +11,16 @@ LAYOUT_TIME_MINUTES            equ #0518
 LAYOUT_TIME_SECONDS            equ #051b
 LAYOUT_TIME_SUBSECONDS         equ #051e
 LAYOUT_CURSOR_ATTR             equ #38
-LAYOUT_BG_ATTR                 equ #46
-LAYOUT_FILEMENU_X              equ 2
-LAYOUT_FILEMENU_Y              equ 17
+LAYOUT_CURSOR_INACTIVE_ATTR    equ #46
+LAYOUT_MENU_BG_ATTR            equ #46
+LAYOUT_MENU_BG_INACTIVE_ATTR   equ #01
+LAYOUT_MENU_HIDDEN_ATTR        equ #00
+LAYOUT_MAINMENU_X              equ 1
+LAYOUT_MAINMENU_Y              equ 2
+LAYOUT_MAINMENU_LINES          equ 15
+LAYOUT_MAINMENU_COLUMNS        equ 14
+LAYOUT_FILEMENU_X              equ 17
+LAYOUT_FILEMENU_Y              equ 2
 LAYOUT_FILEMENU_LINES          equ 20
 LAYOUT_FILEMENU_COLUMNS        equ 14
 LAYOUT_BARS_X                  equ 64

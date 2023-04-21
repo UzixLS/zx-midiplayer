@@ -11,17 +11,17 @@ screen1_page equ 7
     export screen1_page
 
 
-screen_select_files:
-    ld a, #10 + screen0_page
-    ld bc, #7ffd
-    out (c), a
-    ld de, #4000
-    ld hl, screen0
-    ld bc, screen_size
-    ldir
-    ld a, #10
-    ld bc, #7ffd
-    out (c), a
+screen_select_menu:
+    ld a, #10 + screen0_page                  ;
+    ld bc, #7ffd                              ;
+    out (c), a                                ;
+    ld de, #4000                              ;
+    ld hl, screen0                            ;
+    ld bc, screen_size                        ;
+    ldir                                      ;
+    ld a, #10                                 ;
+    ld bc, #7ffd                              ;
+    out (c), a                                ;
 .print:
     LD_SCREEN_ADDRESS hl, LAYOUT_HEAD         ;
     ld ix, str_head                           ;
@@ -42,20 +42,27 @@ screen_select_files:
     cp INT_50_HZ   : jr nz, 1f : ld ix, str_50_hz : jr 2f ;
 1:  cp INT_48_8_HZ : jr nz, 3f : ld ix, str_48_hz : jr 2f ;
 2:  call print_string0                        ;
-3:  ret                                       ;
+3:
+.menus:
+    ld iy, main_menu                          ;
+    call menu_draw                            ;
+    ld iy, file_menu                          ;
+    call menu_draw                            ;
+    call menu_main_file_set_style             ;
+    ret                                       ;
 
 
 screen_select_player:
-    ld a, #10 + screen1_page
-    ld bc, #7ffd
-    out (c), a
-    ld de, #4000
-    ld hl, screen1
-    ld bc, screen_size
-    ldir
-    ld a, #10
-    ld bc, #7ffd
-    out (c), a
+    ld a, #10 + screen1_page                  ;
+    ld bc, #7ffd                              ;
+    out (c), a                                ;
+    ld de, #4000                              ;
+    ld hl, screen1                            ;
+    ld bc, screen_size                        ;
+    ldir                                      ;
+    ld a, #10                                 ;
+    ld bc, #7ffd                              ;
+    out (c), a                                ;
 .print:
     LD_SCREEN_ADDRESS hl, LAYOUT_HEAD         ;
     ld ix, str_head                           ;

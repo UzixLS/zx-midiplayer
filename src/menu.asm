@@ -9,49 +9,70 @@ columns         BYTE
 _lines_used     BYTE
 _cursor_line    BYTE
 _top_element    WORD
+_bg_attr        BYTE
+_cursor_attr    BYTE
     ENDS
 
 
 ; IN  - IY - *menu_t
-menu_call_generator:
-    ld l, (iy+menu_t.generator_fun+0)
-    ld h, (iy+menu_t.generator_fun+1)
-    jp (hl)
+menu_init:
+    xor a                               ;
+    ld (iy+menu_t._top_element+0), a    ;
+    ld (iy+menu_t._top_element+1), a    ;
+    ld (iy+menu_t._cursor_line), a      ;
+    ld a, LAYOUT_MENU_BG_ATTR           ;
+    ld (iy+menu_t._bg_attr), a          ;
+    ld a, LAYOUT_CURSOR_ATTR            ;
+    ld (iy+menu_t._cursor_attr), a      ;
+    ret                                 ;
 
 
-; IN  - D  - colour
 ; IN  - IY - *menu_t
 ; OUT - AF - garbage
 ; OUT - BC - garbage
 ; OUT - DE - garbage
 ; OUT - HL - garbage
-menu_draw_selected_item:
+menu_erase_cursor:
     ld a, (iy+menu_t.y_top)             ;
     add a, (iy+menu_t._cursor_line)     ;
     ld h, a                             ;
+    ld a, (iy+menu_t._bg_attr)          ;
+    jp menu_draw_cursor.common          ;
+
+; IN  - IY - *menu_t
+; OUT - AF - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
+menu_draw_cursor:
+    ld a, (iy+menu_t.y_top)             ;
+    add a, (iy+menu_t._cursor_line)     ;
+    ld h, a                             ;
+    ld a, (iy+menu_t._cursor_attr)      ;
+.common:
     ld l, (iy+menu_t.x_left)            ;
     ld b, (iy+menu_t.columns)           ;
     ld c, 1                             ;
-    ld a, d                             ;
-    call fill_attr_at                   ;
-    ret                                 ;
+    jp fill_attr_at                     ;
 
 
 ; IN  - IY - *menu_t
-menu_first_draw:
-    xor a                               ;
-    ld (iy+menu_t._top_element+0), a    ;
-    ld (iy+menu_t._top_element+1), a    ;
-    ld (iy+menu_t._cursor_line), a      ;
+; OUT - AF - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
+menu_draw_attr:
+    ld b, (iy+menu_t.columns)           ;
+    ld c, (iy+menu_t.lines)             ;
+    ld h, (iy+menu_t.y_top)             ;
+    ld l, (iy+menu_t.x_left)            ;
+    ld a, (iy+menu_t._bg_attr)          ;
+    jp fill_attr_at                     ;
+
 
 ; IN  - IY - *menu_t
 menu_draw:
-    ld b, (iy+menu_t.columns)           ; clear target area
-    ld c, (iy+menu_t.lines)             ; ...
-    ld h, (iy+menu_t.y_top)             ; ...
-    ld l, (iy+menu_t.x_left)            ; ...
-    ld a, LAYOUT_BG_ATTR                ; ...
-    call fill_attr_at                   ; ...
+    call menu_draw_attr                 ; prepare target area
     ld b, (iy+menu_t.lines)             ; ...
     ld c, (iy+menu_t.columns)           ; ...
     ld h, (iy+menu_t.y_top)             ; ...
@@ -80,14 +101,44 @@ menu_draw:
     inc c                               ; y++
     djnz .loop                          ; lines_left--
 .exit:
-    ld d, LAYOUT_CURSOR_ATTR            ;
-    call menu_draw_selected_item        ;
+    call menu_draw_cursor               ;
     ret                                 ;
 
+
+; IN  - IY - *menu_t
+; OUT - AF - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
+menu_style_active:
+    ld a, LAYOUT_MENU_BG_ATTR           ;
+    ld (iy+menu_t._bg_attr), a          ;
+    call menu_draw_attr                 ;
+    ld a, LAYOUT_CURSOR_ATTR            ;
+    ld (iy+menu_t._cursor_attr), a      ;
+    call menu_draw_cursor               ;
+    ret                                 ;
+
+; IN  - IY - *menu_t
+; OUT - AF - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
+menu_style_inactive:
+    ld a, LAYOUT_MENU_BG_INACTIVE_ATTR  ;
+    ld (iy+menu_t._bg_attr), a          ;
+    call menu_draw_attr                 ;
+    ld a, LAYOUT_CURSOR_INACTIVE_ATTR   ;
+    ld (iy+menu_t._cursor_attr), a      ;
+    call menu_draw_cursor               ;
+    ret                                 ;
 
 
 ; IN  - IY - *menu_t
 menu_down:
+    ld a, (iy+menu_t._lines_used)       ; exit if menu is empty
+    or a                                ; ...
+    ret z                               ; ...
     ld a, (iy+menu_t._cursor_line)      ; if cursor on last line - move viewport down
     inc a                               ; ...
     ld b, (iy+menu_t.lines)             ; ...
@@ -96,11 +147,9 @@ menu_down:
     ld b, (iy+menu_t._lines_used)       ; else if there is not all lines are used - exit
     cp b                                ; ...
     ret z                               ; ...
-    ld d, LAYOUT_BG_ATTR                ; else move cursor down
-    call menu_draw_selected_item        ; ...
+    call menu_erase_cursor              ; else move cursor down
     inc (iy+menu_t._cursor_line)        ; ...
-    ld d, LAYOUT_CURSOR_ATTR            ; ...
-    jp menu_draw_selected_item          ; ...
+    jp menu_draw_cursor                 ; ...
 .get_next_element:
     ld l, (iy+menu_t._top_element+0)    ; DE = next element number
     ld h, (iy+menu_t._top_element+1)    ; ...
@@ -140,24 +189,22 @@ menu_up:
     ld a, (iy+menu_t._cursor_line)      ; if cursor on first line - move viewport up
     or a                                ; ...
     jr z, .get_prev_element             ; ...
-    ld d, LAYOUT_BG_ATTR                ; else move cursor up
-    call menu_draw_selected_item        ; ...
+    call menu_erase_cursor              ; else move cursor up
     dec (iy+menu_t._cursor_line)        ; ...
-    ld d, LAYOUT_CURSOR_ATTR            ; ...
-    jp menu_draw_selected_item          ; ...
+    jp menu_draw_cursor                 ; ...
 .get_prev_element:
-    ld l, (iy+menu_t._top_element+0)    ; DE = prev element number
-    ld h, (iy+menu_t._top_element+1)    ; ...
-    ld a, h                             ;
-    or l                                ;
+    ld e, (iy+menu_t._top_element+0)    ; DE = prev element number
+    ld d, (iy+menu_t._top_element+1)    ; ...
+    ld a, d                             ;
+    or e                                ;
     ret z                               ;
-    dec hl                              ;
-    ex de, hl                           ;
+    dec de                              ;
+    push de                             ;
     call menu_call_generator            ; IX = string_pointer
     ret z                               ;
-    dec (iy+menu_t._top_element+0)      ; top_element--
-    jr nc, .scroll                      ; ...
-    dec (iy+menu_t._top_element+1)      ; ...
+    pop de                              ;
+    ld (iy+menu_t._top_element+0), e    ; top_element--
+    ld (iy+menu_t._top_element+1), d    ; ...
 .scroll:
     ld a, (iy+menu_t.lines)             ; if not all lines are used currently - update counter
     cp (iy+menu_t._lines_used)          ; ...
@@ -207,15 +254,13 @@ menu_pagedown:
     ld (iy+menu_t._top_element+1), h    ; ...
     call menu_draw                      ; ...
 .move_cursor_to_last_line:
-    ld d, LAYOUT_BG_ATTR                ;
-    call menu_draw_selected_item        ;
+    call menu_erase_cursor              ;
     ld a, (iy+menu_t._lines_used)       ;
-    dec a                               ;
+    sub 1                               ;
     jp nc, 1f                           ;
     xor a                               ;
 1:  ld (iy+menu_t._cursor_line), a      ;
-    ld d, LAYOUT_CURSOR_ATTR            ;
-    jp menu_draw_selected_item          ;
+    jp menu_draw_cursor                 ;
 
 
 menu_pageup:
@@ -234,12 +279,10 @@ menu_pageup:
     ld (iy+menu_t._top_element+1), h    ; ...
     jp menu_draw                        ;
 .move_cursor_to_first_line:
-    ld d, LAYOUT_BG_ATTR                ; move cursor to the first line
-    call menu_draw_selected_item        ; ...
+    call menu_erase_cursor              ; move cursor to the first line
     xor a                               ; ...
     ld (iy+menu_t._cursor_line), a      ; ...
-    ld d, LAYOUT_CURSOR_ATTR            ; ...
-    jp menu_draw_selected_item          ; ...
+    jp menu_draw_cursor                 ; ...
 
 
 ; IN  - IY - *menu_t
@@ -268,6 +311,12 @@ menu_handle_input:
     jp (hl)                             ; ...
 
 
+; IN  - IY - *menu_t
+menu_call_generator:
+    ld l, (iy+menu_t.generator_fun+0)
+    ld h, (iy+menu_t.generator_fun+1)
+    jp (hl)
+
 
 ; menu_debug_loop:
 ;     ld a, #1f
@@ -276,7 +325,8 @@ menu_handle_input:
 ;     ld a, #c0
 ;     call screen_select
 ;     ld iy, menu_debug
-;     call menu_first_draw
+;     call menu_init
+;     call menu_draw
 ; .loop:
 ;     ei : halt
 ;     call input_process

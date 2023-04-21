@@ -54,6 +54,8 @@ trdos_catalogue_sectors      equ (trdos_max_files*trdos_file_header_size)/trdos_
 
 trdos_var_next_sector        equ #5cf4
 trdos_var_next_track         equ #5cf5
+trdos_var_basic_interceptor  equ #5cc2
+trdos_var_err_sp             equ #5c3d
 
 trdos_entrypoint_commandline equ #3d00
 trdos_entrypoint_basic_cmd   equ #3d03
@@ -87,34 +89,76 @@ trdos_fun_select_side_1      equ #17
 trdos_fun_reconfig_floppy    equ #18
 
 
+trdos_err_handler:
+    ld a, LAYOYT_ERR_FE     ;
+    out (#fe), a            ;
+    ld a, (iy)              ; iy = &err_nr
+    inc a                   ;
+    ld (var_trdos_error), a ;
+    ld a, #ff               ; reset error code
+    ld (iy), a              ;
+    ret                     ;
+
+
+; OUT -  F - Z when ok, NZ when not ok
 trdos_exec_fun:
-    push iy                         ; im1 require IY
-    ld iy, (var_basic_iy)           ;
-    im 1                            ; trdos may crash with im != 1
-    call trdos_entrypoint_exec_fun  ;
-    ld a, high int_im2_vector_table ; set back IM2 interrupt table address (trdos may change it)
-    ld i, a                         ; ...
-    im 2                            ; ...
-    ld (var_basic_iy), iy           ; save IY back
-    pop iy                          ;
-    ret                             ;
+    push iy                                ;
+    push af                                ;
+    xor a                                  ;
+    ld (var_trdos_error), a                ;
+    pop af                                 ;
+.setup_error_handler:
+    ld iy, (trdos_var_err_sp)              ;
+    ld (.A+2), iy                          ;
+    ld iy, .call_end                       ;
+    push iy                                ;
+    ld iy, trdos_err_handler               ;
+    push iy                                ;
+    ld (trdos_var_err_sp), sp              ;
+.call:
+    ld iy, (var_basic_iy)                  ; im1 require IY
+    im 1                                   ; trdos may crash with im != 1
+    call trdos_entrypoint_exec_fun         ;
+    pop af                                 ;
+    pop af                                 ;
+.call_end:
+    ld a, high int_im2_vector_table        ; set back IM2 interrupt table address (trdos may change it)
+    ld i, a                                ; ...
+    im 2                                   ; ...
+    ld (var_basic_iy), iy                  ; save IY back
+.restore_error_handler:
+.A  ld iy, 0                               ; self modifying code! see .setup_error_handler
+    ld (trdos_var_err_sp), iy              ;
+    pop iy                                 ;
+    ld a, (var_trdos_error)                ; check error code != 0
+    or a                                   ;
+    ret                                    ;
 
 
+; OUT -  F - Z when ok, NZ when not ok
+; OUT - AF - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
+; OUT - IX - garbage
 file_load_catalogue:
     xor a                                 ; set zero byte to first file name - same as clearing file list
     ld (file_buffer), a                   ; ...
     di                                    ;
     call trdos_entrypoint_init            ;
-    ld c, trdos_fun_select_drive          ; select drive A
-    ld a, 0                               ; ...
+    ld c, trdos_fun_select_drive          ; select drive A/B/C/D
+    ld a, (var_current_drive)             ; ...
     call trdos_exec_fun                   ; ...
+    ret nz                                ;
     ld c, trdos_fun_read_block            ; read file table
     ld hl, file_buffer                    ; ...
     ld b, trdos_catalogue_sectors         ; ...
     ld de, #0000                          ; ...
     call trdos_exec_fun                   ; ...
+    ret nz                                ;
     call file_catalogue_optimize          ;
     call file_catalogue_format_extensions ;
+    xor a                                 ; Z=1
     ret                                   ;
 
 file_catalogue_optimize:          ; reorganize catalogue to skip all deleted files
@@ -279,7 +323,8 @@ file_get_current_file_size:
     ret                               ;
 
 
-; IN  - E - file number [0..127]
+; IN  -  E - file number [0..127]
+; OUT -  F - Z when ok, NZ when not ok
 file_load:
     xor a                                   ;
     ld (var_current_file_number+1), a       ;
@@ -296,7 +341,12 @@ file_load:
     sla e : rl d                            ; ...
     ld ix, file_buffer                      ; IX = file_buffer + entry_number * 16
     add ix, de                              ; ...
-    ld a, (ix+#b)                           ; file size in bytes
+    ld a, (ix+#0)                           ; if name[0] == NULL - incorrect entry, exit
+    or a                                    ; ...
+    jr nz, 1f                               ; ...
+    or 1                                    ; ... set NZ flag
+    ret                                     ; ...
+1:  ld a, (ix+#b)                           ; file size in bytes
     ld (var_current_file_size+0), a         ; ...
     ld a, (ix+#c)                           ; ...
     ld (var_current_file_size+1), a         ; ...
@@ -316,6 +366,7 @@ file_load:
     call trdos_exec_fun                     ; memcpy( hl, de, b )
     pop hl                                  ;
     pop bc                                  ;
+    ret nz                                  ;
 .loop_check_next_page:
     ld a, b                                 ; B = B - 64
     sub file_page_size/trdos_sector_size    ; ...
@@ -334,4 +385,5 @@ file_load:
 .exit:
     ld a, #0f                               ; reset page
     ld (file_get_next_byte.pg+1), a         ; ...
+    xor a                                   ; Z=1
     ret                                     ;

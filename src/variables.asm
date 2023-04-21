@@ -22,6 +22,9 @@ var_input_key_hold_timer: BYTE 0
 
 var_basic_iy WORD 0
 var_int_counter WORD 0
+var_current_menu DB 0
+var_current_menu_ptr WORD main_menu
+var_current_drive DB 0
 var_smf_file smf_file_t
 var_tmp32 BLOCK 32
 
@@ -32,3 +35,4 @@ var_vis_state vis_state_t
 
 var_current_file_number WORD 0
 var_current_file_size WORD 0
+var_trdos_error DB 0
