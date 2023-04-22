@@ -35,4 +35,6 @@ var_vis_state vis_state_t
 
 var_current_file_number WORD 0
 var_current_file_size WORD 0
+var_screen_proc_addr WORD 0
 var_trdos_error DB 0
+var_trdos_cleared_screen DB 0

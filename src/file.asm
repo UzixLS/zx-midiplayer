@@ -89,6 +89,31 @@ trdos_fun_select_side_1      equ #17
 trdos_fun_reconfig_floppy    equ #18
 
 
+trdos_basic_interceptor:
+    ex (sp), hl                      ;
+    push af                          ;
+    push de                          ;
+    push hl                          ;
+    ld de, #0d6b                     ; #0d6b - clear screen procedure in basic48 rom
+    xor a                            ;
+    sbc hl, de                       ;
+    jr z, .handle_screen_clear       ;
+    pop hl                           ;
+    pop de                           ;
+    pop af                           ;
+    ex (sp), hl                      ;
+    ret                              ;
+.handle_screen_clear:
+    pop hl                           ;
+    pop de                           ;
+    ld a, 1                          ;
+    ld (var_trdos_cleared_screen), a ; var_trdos_cleared_screen=1
+    pop af                           ;
+    ld hl, #0d6e                     ; do not clear all screen, just clear low area
+    ex (sp), hl                      ;
+    ret                              ;
+
+
 trdos_err_handler:
     ld a, LAYOYT_ERR_FE     ;
     out (#fe), a            ;
@@ -106,6 +131,11 @@ trdos_exec_fun:
     push af                                ;
     xor a                                  ;
     ld (var_trdos_error), a                ;
+.setup_basic_interceptor:
+    ld a, #c3                              ; "jp trdos_basic_interceptor"
+    ld (trdos_var_basic_interceptor+0), a  ; ...
+    ld iy, trdos_basic_interceptor         ; ...
+    ld (trdos_var_basic_interceptor+1), iy ; ...
     pop af                                 ;
 .setup_error_handler:
     ld iy, (trdos_var_err_sp)              ;
@@ -129,6 +159,17 @@ trdos_exec_fun:
 .restore_error_handler:
 .A  ld iy, 0                               ; self modifying code! see .setup_error_handler
     ld (trdos_var_err_sp), iy              ;
+.restore_basic_interceptor
+    ld a, #c9                              ; "ret"
+    ld (trdos_var_basic_interceptor+0), a  ; ...
+.restore_screen:
+    ld a, (var_trdos_cleared_screen)       ; if (cleared_screen != 0) redraw screen
+    or a                                   ; ...
+    jr z, .exit                            ; ...
+    xor a                                  ; ...
+    ld (var_trdos_cleared_screen), a       ; ...
+    call screen_redraw                     ; ...
+.exit:
     pop iy                                 ;
     ld a, (var_trdos_error)                ; check error code != 0
     or a                                   ;
@@ -148,6 +189,9 @@ file_load_catalogue:
     call trdos_entrypoint_init            ;
     ld c, trdos_fun_select_drive          ; select drive A/B/C/D
     ld a, (var_current_drive)             ; ...
+    call trdos_exec_fun                   ; ...
+    ret nz                                ;
+    ld c, trdos_fun_reconfig_floppy       ; init floppy disk parameters
     call trdos_exec_fun                   ; ...
     ret nz                                ;
     ld c, trdos_fun_read_block            ; read file table
@@ -174,11 +218,11 @@ file_catalogue_optimize:          ; reorganize catalogue to skip all deleted fil
     jr z, .bad_entry              ; ...
 .good_entry:
     ld a, (hl)                    ; save good entry
-    ld (ix), a                    ;
-    inc hl                        ;
-    inc ix                        ;
-    dec e                         ;
-    jr nz, .good_entry            ;
+    ld (ix), a                    ; ...
+    inc hl                        ; ...
+    inc ix                        ; ...
+    dec e                         ; ...
+    jr nz, .good_entry            ; ...
     ld e, trdos_file_header_size  ;
     djnz .loop                    ;
     jp .exit                      ;
@@ -270,8 +314,10 @@ file_menu_generator:
     ld hl, file_buffer        ; HL = file_buffer + entry_number * 16
     add hl, de                ; ...
     pop de                    ;
-    ld a, (hl)                ; if first byte == NULL - return error (no entry)
+    ld a, (hl)                ; if first byte == 0x00 or 0xFF - return error (no entry)
     or a                      ; ...
+    ret z                     ; ...
+    inc a                     ; ...
     ret z                     ; ...
     ld ix, file_menu_string+2 ;
     push bc                   ;

@@ -12,6 +12,9 @@ screen1_page equ 7
 
 
 screen_select_menu:
+    ld hl, .load                              ;
+    ld (var_screen_proc_addr), hl             ;
+.load:
     ld a, #10 + screen0_page                  ;
     ld bc, #7ffd                              ;
     out (c), a                                ;
@@ -53,6 +56,9 @@ screen_select_menu:
 
 
 screen_select_player:
+    ld hl, .load                              ;
+    ld (var_screen_proc_addr), hl             ;
+.load:
     ld a, #10 + screen1_page                  ;
     ld bc, #7ffd                              ;
     out (c), a                                ;
@@ -68,3 +74,8 @@ screen_select_player:
     ld ix, str_head                           ;
     call print_string0                        ;
     ret                                       ;
+
+
+screen_redraw:
+    ld hl, (var_screen_proc_addr)
+    jp (hl)

@@ -82,7 +82,7 @@ exit:
     ld bc, #7ffd ; ...
     out (c), a   ; ...
     out (#fe), a ;
-    jp 0         ;
+    rst 0        ;
 
 
 
