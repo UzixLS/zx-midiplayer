@@ -2,10 +2,9 @@
     ASSERT LAYOUT_BARS_HEIGHT==8*8
 
     STRUCT vis_state_t
-_zerobyte   BYTE 0              ; used in vis_init
-logo_step   BYTE 0              ;
-bar_current BLOCK LAYOUT_BARS_N ;
-bar_diff    BLOCK LAYOUT_BARS_N ;
+_zerobyte   BYTE 0                ; used in vis_init
+logo_step   BYTE 0                ;
+bar_value   BLOCK LAYOUT_BARS_N*2 ; byte 0,2,4... - target_value, byte 1,3,5... - current_value
     ENDS
 
 
@@ -85,7 +84,6 @@ vis_process_key:
 ; IN - A  - command byte
 ; IN - HL - file position
 ; OUT - F  - garbage
-; OUT - BC - garbage
 ; OUT - DE - garbage
 ; OUT - IX - garbage
 vis_process_command:
@@ -98,36 +96,43 @@ vis_process_command:
     ld a, e                                      ;
     ret                                          ;
 .note_on:
+    push bc                                      ;
     push hl                                      ;
     call file_get_next_byte                      ; C = note number
     and #7f                                      ; ...
     ld c, a                                      ; ...
-    call file_get_next_byte                      ; D = velocity
+    push af                                      ;
+    call file_get_next_byte                      ; D = velocity [0..127]
     ld d, a                                      ; ...
     call vis_process_key                         ;
-    ld hl, var_vis_state+vis_state_t.bar_current ;
-    ld a, e                                      ;
-    and #0f                                      ;
-    ld c, a                                      ;
-    ld b, 0                                      ;
-    add hl, bc                                   ;
-    ld a, d                                      ; A = velocity
-    srl a : srl a                                ; 32 lines (4*8)
-    sub (hl)                                     ; A = new - current
-    jr z, 1f                                     ;
-    ld hl, var_vis_state+vis_state_t.bar_diff    ;
-    add hl, bc                                   ;
-    ld (hl), a                                   ; diff = A
-1:  pop hl                                       ;
+    ld hl, var_vis_state+vis_state_t.bar_value   ;
+    pop af                                       ; A = note number
+    cp 95+1                                      ; if (note_number > 95) note_number = 95
+    jp c, 1f                                     ; ...
+    ld a, 95                                     ; ...
+1:  sub 32                                       ; note_number = note_number - 32
+    jp nc, 1f                                    ; if (note_number < 0) note_number = 0
+    xor a                                        ; ...
+1:  rra                                          ; HL = &target_value[channel]
+    and #1e                                      ; ...
+    ld c, a                                      ; ...
+    ld b, 0                                      ; ...
+    add hl, bc                                   ; ...
+    srl d : srl d                                ; velocity = [0..31] - 4*8=32 lines
+    ld (hl), d                                   ; target = velocity
+    pop hl                                       ;
+    pop bc                                       ;
     ld a, e                                      ;
     ret                                          ;
 .note_off:
+    push bc                                      ;
     push hl                                      ;
     call file_get_next_byte                      ; IXH = note number
     ld c, a                                      ;
-    xor a                                        ;
+    xor a                                        ; velocity = 0
     call vis_process_key                         ;
     pop hl                                       ;
+    pop bc                                       ;
     ld a, e                                      ;
     ret                                          ;
 
@@ -136,67 +141,54 @@ vis_process_command:
 ; OUT - BC  - garbage
 ; OUT - DE  - garbage
 ; OUT - HL  - garbage
-; OUT - IXL - garbage
 vis_process_frame:
 .bars_animation:
-    ld de, LAYOUT_BARS_N-1                       ;
+    ld de, LAYOUT_BARS_N-1                       ; E = current bar number (X)
 .loop_next_chan:
-    ld hl, var_vis_state+vis_state_t.bar_diff    ;
-    add hl, de                                   ;
-    ld a, (hl)                                   ;
-    or a                                         ;
-    jp z, .next_chan                             ;
-    jp s, .bar_down                              ;
-.bar_up:
-    ld ixl, a                                    ; IXL = diff
-    ld a, -LAYOUT_BARS_HEIGHT/2                  ; set diff
-    ld (hl), a                                   ; ...
-    ld hl, var_vis_state+vis_state_t.bar_current ; current += diff (IXL)
+    ld hl, var_vis_state+vis_state_t.bar_value   ; HL = &target_value[channel]
     add hl, de                                   ; ...
-    ld b, (hl)                                   ; ...
-    ld a, b                                      ; ...
-    add ixl                                      ; ...
-    ld (hl), a                                   ; ...
+    add hl, de                                   ; ...
+    ld a, (hl)                                   ; A = target
+    ld (hl), d                                   ; target = 0
+    inc hl                                       ; HL = &current_value[channel]
+    ld b, (hl)                                   ; B = current
+    cp b                                         ;
+    jp z, .next_chan                             ; if (target == current) next chan
+    jp c, .bar_down                              ; if (target < current)
+.bar_up:
+    ld (hl), a                                   ; current = target
+    ld c, a                                      ;
+    sub b                                        ; D = diff = target - current
+    ld d, a                                      ; ...
     ld a, (LAYOUT_BARS_Y + LAYOUT_BARS_HEIGHT)/2 ; B = Y coordinate
-    sub b                                        ; ...
-    sub ixl                                      ; ...
+    sub c                                        ; ...
     sla a                                        ; ...
     ld b, a                                      ; ...
     ld a, e                                      ; C = X coordinate
     rlca : rlca : rlca                           ; ...
     add LAYOUT_BARS_X                            ; ...
     ld c, a                                      ; ...
-    call get_pixel_address                       ;
+    call get_pixel_address                       ; HL = address
+    ld b, LAYOUT_BARS_PIXELS                     ; draw diff bars from top to bottom
 .bar_up_loop:
-    ld a, LAYOUT_BARS_PIXELS                     ;
-    ld (hl), a                                   ;
-    dec ixl                                      ;
-    jp z, .next_chan                             ;
-    call pixel_address_down                      ;
-    call pixel_address_down                      ;
-    jp .bar_up_loop                              ;
+    ld (hl), b                                   ; ...
+    dec d                                        ; ... diff--
+    jr z, .next_chan                             ; ...
+    call pixel_address_down                      ; ...
+    call pixel_address_down                      ; ...
+    jp .bar_up_loop                              ; ...
 .bar_down:
-    inc (hl)                                     ;
-    ld hl, var_vis_state+vis_state_t.bar_current ;
-    add hl, de                                   ;
-    ld b, (hl)                                   ;
-    dec (hl)                                     ;
-    jp nz, 1f                                    ;
-    ld hl, var_vis_state+vis_state_t.bar_diff    ;
-    add hl, de                                   ;
-    xor a                                        ;
-    ld (hl), a                                   ;
-1:  sla b                                        ;
-    ld a, LAYOUT_BARS_Y + LAYOUT_BARS_HEIGHT     ;
-    sub b                                        ;
-    ld b, a                                      ;
-    ld a, e                                      ;
-    rlca : rlca : rlca                           ;
-    add LAYOUT_BARS_X                            ;
-    ld c, a                                      ;
-    call get_pixel_address                       ;
-    xor a                                        ;
-    ld (hl), a                                   ;
+    dec (hl)                                     ; current--
+    sla b                                        ; B = Y coordinate
+    ld a, LAYOUT_BARS_Y + LAYOUT_BARS_HEIGHT     ; ...
+    sub b                                        ; ...
+    ld b, a                                      ; ...
+    ld a, e                                      ; C = X coordinate
+    rlca : rlca : rlca                           ; ...
+    add LAYOUT_BARS_X                            ; ...
+    ld c, a                                      ; ...
+    call get_pixel_address                       ; HL = address
+    ld (hl), d                                   ; clear bar line
 .next_chan:
     dec e                                        ;
     jp p, .loop_next_chan                        ;

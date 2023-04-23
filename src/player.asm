@@ -60,9 +60,7 @@ player_loop:
     call smf_handle_meta           ; ... instead, process it locally. HL = next track position
     jp .process_current_track      ; ...
 .vis:
-    push bc                        ;
     call vis_process_command       ;
-    pop bc                         ;
 .status_send:
     ld ixh, b : ld ixl, c          ; IX = data len
     di : call uart_putc : ei       ; send status
