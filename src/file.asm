@@ -19,9 +19,8 @@ file_page_size equ #4000
 ; OUT -  A - data
 ; OUT - HL - next file position
 ; OUT -  F - garbage
+; OUT - BC - garbage
 file_get_next_byte:
-    push bc                                                          ;
-    push hl                                                          ;
     ld a, h                                                          ; compare requested page with current page
     and #c0                                                          ; ...
 .pg:cp #0f                                                           ; ... self modifying code! see bellow and file_load
@@ -36,14 +35,12 @@ file_get_next_byte:
 .get:
     ld a, h                                                          ; position = position[5:0]
     and #3f                                                          ; ...
-    ld h, a                                                          ; ...
-    ld bc, file_base_addr                                            ; A  = *(base_addr + position)
-    add hl, bc                                                       ; ...
-    ld a, (hl)                                                       ; ...
-    pop hl                                                           ;
+    add high file_base_addr                                          ; A = *(base_addr + position)
+    ld b, a                                                          ; ...
+    ld c, l                                                          ; ...
+    ld a, (bc)                                                       ; ...
     inc hl                                                           ; position++
-    pop bc                                                           ;
-    ret
+    ret                                                              ;
 
 
 

@@ -361,12 +361,13 @@ pixel_address_up:
 ; IN  -  L - X character position [0..31]
 ; OUT -  A - 0
 ; OUT - IX - pointer to NULL byte
+; OUT - HL - screen address of last printed character
 ; OUT -  F - garbage
 ; OUT - BC - garbage
 ; OUT - DE - garbage
-; OUT - HL - garbage
-print_string0:
+print_string0_at:
     call get_char_address ; HL = screen address
+print_string0:
 .loop:
     ld a, (ix)            ; fetch the character to print
     or a                  ; exit if NULL character detected
@@ -375,7 +376,7 @@ print_string0:
     inc l                 ; go to the next screen address
     inc ix                ; increase IX to the next character
     jr .loop              ; loop back to print next character
-    ret
+    ret                   ;
 
 ; Print string
 ; IN  - IX - pointer to string
@@ -384,11 +385,12 @@ print_string0:
 ; IN  -  B - string length
 ; OUT -  A - 0
 ; OUT - IX - pointer to NULL byte
+; OUT - HL - screen address of last printed character
 ; OUT -  F - garbage
 ; OUT - DE - garbage
-; OUT - HL - garbage
-print_stringl:
+print_stringl_at:
     call get_char_address ; HL = screen address
+print_stringl:
 .loop:
     ld a, (ix)            ; fetch the character to print
     push bc               ;
@@ -396,8 +398,8 @@ print_stringl:
     pop bc                ;
     inc l                 ; go to the next screen address
     inc ix                ; increase IX to the next character
-    djnz .loop:           ; loop back to print next character
-    ret
+    djnz .loop            ; loop back to print next character
+    ret                   ;
 
 
 ; Print a HEX/BCD value

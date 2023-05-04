@@ -102,7 +102,9 @@ vis_process_command:
     and #7f                                      ; ...
     ld c, a                                      ; ...
     push af                                      ;
+    push bc                                      ;
     call file_get_next_byte                      ; D = velocity [0..127]
+    pop bc                                       ;
     ld d, a                                      ; ...
     call vis_process_key                         ;
     ld hl, var_vis_state+vis_state_t.bar_value   ;

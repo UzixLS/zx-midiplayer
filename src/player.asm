@@ -127,7 +127,9 @@ player_set_title:
     ld (ix+LAYOUT_TITLE_LEN-1), udg_ellipsis ; ...
     ld b, LAYOUT_TITLE_LEN-1                 ;
 .loadstring:
+    push bc                                  ;
     call file_get_next_byte                  ; A = char
+    pop bc                                   ;
     ld (ix), a                               ; *var_tmp32++ = A
     inc ix                                   ; ...
     djnz .loadstring                         ; repeat while (--len)
@@ -142,7 +144,7 @@ player_set_title:
     djnz 1b                                  ; repeat while (--len)
 .printstring:
     ld b, LAYOUT_TITLE_LEN                   ;
-    ld hl, LAYOUT_TITLE                      ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_TITLE       ;
     ld ix, var_tmp32                         ;
     call print_stringl                       ;
     ret                                      ;

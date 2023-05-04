@@ -94,7 +94,7 @@ menu_draw:
     push bc                             ;
     ld h, c                             ; print IX
     ld l, (iy+menu_t.x_left)            ; ...
-    call print_string0                  ; ...
+    call print_string0_at               ; ...
     pop bc                              ;
     pop de                              ;
     inc (iy+menu_t._lines_used)         ; lines_used++
@@ -181,7 +181,7 @@ menu_down:
     add (iy+menu_t._lines_used)         ;
     dec a                               ;
     ld h, a                             ;
-    jp print_string0                    ;
+    jp print_string0_at                 ;
 
 
 ; IN  - IY - *menu_t
@@ -225,7 +225,7 @@ menu_up:
     pop ix                              ;
     ld h, (iy+menu_t.y_top)             ;
     ld l, (iy+menu_t.x_left)            ;
-    jp print_string0                    ;
+    jp print_string0_at                 ;
 
 
 menu_pagedown:
