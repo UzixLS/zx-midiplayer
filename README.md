@@ -1,5 +1,6 @@
 # WORK IN PROGRESS
 MIDI Player for ZX Spectrum.
+[![screenshot](screenshot.png)](screenshot.png?raw=true)
 * Support for any ZX Spectrum-compatible computer with 128 RAM, e.g.:
     - ZX Spectrum 128/+2/+3 with [MAYK](https://github.com/konkotgit/MAYK) addon;
     - [Sizif-512](https://github.com/UzixLS/zx-sizif-512) with [extension board](https://github.com/UzixLS/zx-sizif-512-ext);
@@ -24,3 +25,7 @@ You may use addon with builtin MIDI synthesizer or connect an external one to yo
 - Implement FAT32 support
 - Implement DivMMC, ZXMMC and Z-Controller support
 - Correctly handle TRDOS-less environment
+- Handle last entry in playlist
+- Fix too fast playing
+- Fix too slow playing
+- Fix trdos break key
