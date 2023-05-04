@@ -200,11 +200,20 @@ player_set_tempo:
 ; OUT - DE - garbage
 ; OUT - IX - garbage
 player_set_filename:
-    push hl                              ;
-    LD_SCREEN_ADDRESS hl, LAYOUT_FILENAME;
-    call print_string0                   ;
-    pop hl                               ;
-    ret                                  ;
+    push hl                                                   ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_FILENAME                     ;
+    call print_string0                                        ;
+.fill_tail_with_spaces:
+    ld a, l                                                   ; if (printed_chars < total chars) - fill tail with spaces
+    and #1f                                                   ; ... screen address (HL): 010yyyyy yyyxxxxx
+    cp (low LAYOUT_FILENAME)+LAYOUT_FILENAME_LEN              ; ...
+    jr nc, 1f                                                 ; ...
+    ld a, ' '                                                 ; ...
+    call print_char                                           ; ...
+    inc l                                                     ; ...
+    jr .fill_tail_with_spaces                                 ; ...
+1:  pop hl                                                    ;
+    ret                                                       ;
 
 ; IN  - BC - size value
 ; OUT - AF - garbage

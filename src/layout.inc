@@ -3,6 +3,7 @@ LAYOUT_DEBUG                   equ #0201
 LAYOUT_TITLE                   equ #0301
 LAYOUT_TITLE_LEN               equ 30
 LAYOUT_FILENAME                equ #0501
+LAYOUT_FILENAME_LEN            equ 8+1+3
 LAYOUT_SIZE                    equ #0902
 LAYOUT_TRACKS                  equ #0B02
 LAYOUT_TEMPO                   equ #0D02
