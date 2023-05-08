@@ -10,6 +10,7 @@ minutes_h        BYTE 0
     ENDS
 
 PLAYER_FLAG_TITLE_SET equ 0
+PLAYER_FLAG_FF        equ 1
 
 
 
@@ -34,26 +35,44 @@ player_loop:
     call player_set_ppqn           ;
     call smf_get_tempo             ;
     call player_set_tempo          ;
+    call player_redraw_buttons     ;
     ld a, (var_int_counter)        ;
     ld (var_player_state.last_int_counter), a ;
 .loop:
     call vis_process_frame         ;
     call player_update_timer       ;
-    ld hl, var_player_state.last_int_counter ; if (last_int_counter != current_int_counter) - skip halt
-    ld a, (var_int_counter)        ; ...
+    ld hl, var_player_state.flags  ; if in fast forward mode - skip halt
+    bit PLAYER_FLAG_FF, (hl)       ; ...
+    ld hl, var_player_state.last_int_counter ;
+    jp nz, .ff_sub                 ; ...
+    xor a                          ;
+    ld (var_input_no_beep), a      ;
+    ld a, (var_int_counter)        ; if (last_int_counter != current_int_counter) - skip halt
     cp (hl)                        ; ...
-    jr nz, 1f                      ; ...
+    jr nz, .frame_start            ; ...
     xor a : out (#fe), a           ;
     halt                           ;
     inc a : out (#fe), a           ;
-1:  inc (hl)                       ; increment last_int_counter
+.frame_start:
+    inc (hl)                       ; increment last_int_counter
     call uart_flush_txbuf          ;
     call input_process             ;
-    ld a, (var_input_key)          ;
+    ld a, b                        ;
+    cp INPUT_KEY_RIGHT             ; fast forward while holding right key
+    jr nz, 1f                      ; ...
+    ld hl, var_player_state.flags  ; ...
+    set PLAYER_FLAG_FF, (hl)       ; ...
+    call player_redraw_buttons     ; ...
+    jr .process_tracks             ; ...
+1:  ld a, (var_input_key)          ;
     cp INPUT_KEY_BACK              ;
     jr z, .end                     ;
     cp INPUT_KEY_ACT               ;
     jr z, .load_next_file          ;
+    cp INPUT_KEY_DOWN              ;
+    jr z, .load_next_file          ;
+    cp INPUT_KEY_UP                ;
+    jr z, .load_prev_file          ;
 .process_tracks:
     call smf_get_first_track       ;
     jr z, .load_next_file          ;
@@ -81,8 +100,21 @@ player_loop:
     jp .data_send                  ; ...
 .next_track:
     call smf_get_next_track        ;
-    jr z, .loop                    ;
-    jp .process_current_track      ;
+    jp nz, .process_current_track  ;
+    jp .loop                       ;
+.ff_sub:
+    ld a, 1                        ;
+    ld (var_input_no_beep), a      ;
+    res PLAYER_FLAG_FF, (ix)       ;
+    call player_redraw_buttons     ;
+    ld a, (var_int_counter)        ;
+    dec a                          ;
+    ld (var_player_state.last_int_counter), a ;
+    jp .frame_start                ;
+.load_prev_file:
+    ld a, 1                          ;
+    ld (var_player_prevfile_flag), a ;
+    jr .end                          ;
 .load_next_file:
     ld a, 1                          ;
     ld (var_player_nextfile_flag), a ;
@@ -308,3 +340,25 @@ player_update_timer:
     ld (var_player_state.minutes_h), a
     add '0'
     jp print_char
+
+
+player_redraw_buttons:
+    push hl
+    ld ix, var_player_state.flags
+.play_button:
+    ld a, LAYOUT_PLAYBUTTON_ACTIVE_ATTR
+    LD_ATTR_ADDRESS hl, LAYOUT_PLAYER_BUTTONBAR+#0002
+    ld (hl), a : inc hl : ld (hl), a : inc hl : ld (hl), a
+    LD_ATTR_ADDRESS hl, LAYOUT_PLAYER_BUTTONBAR+#0102
+    ld (hl), a : inc hl : ld (hl), a : inc hl : ld (hl), a
+.rewind_button:
+    bit PLAYER_FLAG_FF, (ix)
+    ld a, LAYOUT_PLAYBUTTON_ATTR
+    jr z, 1f
+    ld a, LAYOUT_PLAYBUTTON_ACTIVE_ATTR
+1:  LD_ATTR_ADDRESS hl, LAYOUT_PLAYER_BUTTONBAR+#0005
+    ld (hl), a : inc hl : ld (hl), a
+    LD_ATTR_ADDRESS hl, LAYOUT_PLAYER_BUTTONBAR+#0105
+    ld (hl), a : inc hl : ld (hl), a
+    pop hl
+    ret

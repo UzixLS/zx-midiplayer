@@ -19,6 +19,7 @@ INPUT_KEY_BACK  equ 32
 var_input_key BYTE INPUT_KEY_NONE
 var_input_key_last: BYTE INPUT_KEY_NONE
 var_input_key_hold_timer: BYTE 0
+var_input_no_beep: BYTE 0
 
 var_basic_iy WORD 0
 var_int_counter BYTE 0
@@ -30,6 +31,7 @@ var_tmp32 BLOCK 32
 
 var_player_state player_state_t
 var_player_nextfile_flag BYTE 0
+var_player_prevfile_flag BYTE 0
 
 var_vis_state vis_state_t
 

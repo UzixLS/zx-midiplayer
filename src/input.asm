@@ -137,14 +137,17 @@ input_read:
 
 ; OUT - AF - garbage
 input_beep:
-    ld a, #10              ;
-    out (#fe), a           ;
-    ld a, INPUT_BEEP_DELAY ;
+    ld a, (var_input_no_beep) ;
+    or a                      ;
+    ret nz                    ;
+    ld a, #10                 ;
+    out (#fe), a              ;
+    ld a, INPUT_BEEP_DELAY    ;
 .loop:
-    dec a                  ;
-    jr nz, .loop           ;
-    out (#fe), a           ;
-    ret                    ;
+    dec a                     ;
+    jr nz, .loop              ;
+    out (#fe), a              ;
+    ret                       ;
 
 
 ; OUT -  B - current pressed key mask
