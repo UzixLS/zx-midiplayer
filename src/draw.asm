@@ -311,7 +311,7 @@ get_pixel_address:
     and %00011111       ; mask out unwanted bits
     or l                ; OR with Y5, Y4, Y3
     ld l, a             ; store in L
-    ld A, C
+    ld a, c
     and 7
     ret
 

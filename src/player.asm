@@ -1,18 +1,18 @@
     STRUCT player_state_t
-flags        BYTE 0
-subseconds_l BYTE 0
-subseconds_h BYTE 0
-seconds_l    BYTE 0
-seconds_h    BYTE 0
-minutes_l    BYTE 0
-minutes_h    BYTE 0
+flags            BYTE 0
+last_int_counter BYTE 0
+subseconds_l     BYTE 0
+subseconds_h     BYTE 0
+seconds_l        BYTE 0
+seconds_h        BYTE 0
+minutes_l        BYTE 0
+minutes_h        BYTE 0
     ENDS
 
 PLAYER_FLAG_TITLE_SET equ 0
 
 
 
-; IN  - HL - file position of first track data byte
 player_loop:
     ld de, var_player_state        ;
     ld b, player_state_t           ;
@@ -21,6 +21,7 @@ player_loop:
     ld (de), a                     ;
     inc de                         ;
     djnz .init_state               ;
+    ld (uart_txbuf_len), a         ;
     call player_reset_chip         ;
     call vis_init                  ;
     call file_get_current_file_name;
@@ -33,14 +34,20 @@ player_loop:
     call player_set_ppqn           ;
     call smf_get_tempo             ;
     call player_set_tempo          ;
+    ld a, (var_int_counter)        ;
+    ld (var_player_state.last_int_counter), a ;
 .loop:
-    push hl                        ;
     call vis_process_frame         ;
     call player_update_timer       ;
-    pop hl                         ;
+    ld hl, var_player_state.last_int_counter ; if (last_int_counter != current_int_counter) - skip halt
+    ld a, (var_int_counter)        ; ...
+    cp (hl)                        ; ...
+    jr nz, 1f                      ; ...
     xor a : out (#fe), a           ;
     halt                           ;
     inc a : out (#fe), a           ;
+1:  inc (hl)                       ; increment last_int_counter
+    call uart_flush_txbuf          ;
     call input_process             ;
     ld a, (var_input_key)          ;
     cp INPUT_KEY_BACK              ;
@@ -63,13 +70,13 @@ player_loop:
     call vis_process_command       ;
 .status_send:
     ld ixh, b : ld ixl, c          ; IX = data len
-    di : call uart_putc : ei       ; send status
+    call uart_putc_txbuf           ; send status
 .data_send:
     ld a, ixh                      ; if len == 0 then go for next status
     or ixl                         ; ...
     jr z, .process_current_track   ; ...
     call file_get_next_byte        ; A = data
-    di : call uart_putc : ei       ; send data
+    call uart_putc_txbuf           ; send data
     dec ix                         ; len--
     jp .data_send                  ; ...
 .next_track:
@@ -80,6 +87,7 @@ player_loop:
     ld a, 1                          ;
     ld (var_player_nextfile_flag), a ;
 .end:
+    call uart_flush_txbuf            ;
     ; jp player_reset_chip           ;
 
 
@@ -105,6 +113,7 @@ player_reset_chip:
 ; IN  - BC - string len
 ; IN  - HL - file position
 ; OUT - AF - garbage
+; OUT - B  - garbage
 ; OUT - DE - garbage
 ; OUT - HL - garbage
 ; OUT - IX - garbage
@@ -136,9 +145,9 @@ player_set_title:
 .append_trailing_spaces:
     ld a, LAYOUT_TITLE_LEN                   ; clear trailing characters
     sub c                                    ; ...
-    jr z, .printstring                       ; check len == LAYOUT_TITLE_LEN
+    jr z, .printstring                       ; ... check len == LAYOUT_TITLE_LEN
     ld b, a                                  ; ...
-    ld a, 32                                 ; ... 32 - space
+    ld a, ' '                                ; ...
 1:  ld (ix), a                               ; ...
     inc ix                                   ; ...
     djnz 1b                                  ; repeat while (--len)
@@ -150,14 +159,13 @@ player_set_title:
     ret                                      ;
 
 
-; IN  - C  - tracks value
+; IN  - A  - tracks value
 ; OUT - AF - garbage
 ; OUT - BC - garbage
 ; OUT - DE - garbage
 player_set_tracks:
     push hl                              ;
     LD_SCREEN_ADDRESS hl, LAYOUT_TRACKS  ;
-    ld a, c                              ;
     call print_hex                       ;
     pop hl                               ;
     ret                                  ;
@@ -178,14 +186,13 @@ player_set_ppqn:
     pop hl                               ;
     ret                                  ;
 
-; IN - CIX - tempo value
+; IN - AIX - tempo value
 ; OUT - AF - garbage
 ; OUT - BC - garbage
 ; OUT - DE - garbage
 player_set_tempo:
     push hl                              ;
     LD_SCREEN_ADDRESS hl, LAYOUT_TEMPO   ;
-    ld a, c                              ;
     call print_hex                       ;
     ld a, ixh                            ;
     call print_hex                       ;

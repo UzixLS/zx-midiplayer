@@ -19,20 +19,19 @@
     ENDM
 
     page 0
-    org int_handler-(variables0_end-variables0)
+    org int_handler-(variables0_end-begin)
     assert $ >= #6000
 begin:
     db "Code begin",0
-variables0:
     include "variables_low.asm"
 variables0_end:
 
     org #7f7f
 int_handler:
     push af
-    ld a, (var_int_counter+1)
+    ld a, (var_int_counter)
     inc a
-    ld (var_int_counter+1), a
+    ld (var_int_counter), a
     pop af
 .A: ei                        ; (1 byte) self modifying code! see device_detect_cpu_int
     ret                       ; (1 byte) ...
@@ -48,7 +47,7 @@ int_im2_vector_table:
 main:
     di                              ;
     ld sp, stack_top                ;
-    ld (var_basic_iy), iy           ; save IY as it required for BASIC/TRDOS calls
+    ld (var_basic_iy), iy           ; save IY as it's required for BASIC/TRDOS calls
     ld a, high int_im2_vector_table ; set IM2 interrupt table address (#8000-#8100)
     ld i, a                         ; ...
     im 2                            ; ...
@@ -57,6 +56,7 @@ main:
     out (c), a                      ; ...
     call device_detect_cpu_int      ;
     call uart_init                  ;
+    call smf_init                   ;
     call input_detect_kempston      ;
     ld iy, main_menu                ;
     call menu_init                  ;

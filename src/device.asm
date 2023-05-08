@@ -3,22 +3,22 @@ device_detect_cpu_int:
 .enter:
     ld bc, 0                       ; counter = 0
     ei : halt                      ;
-    ld a, (var_int_counter+1)      ; D = int_counter+1
+    ld a, (var_int_counter)        ; D = int_counter+1
     inc a                          ; ...
     ld d, a                        ; ...
     ei : halt                      ;
 .loop:                             ; 33 T-states
     inc bc                         ; (6) counter++
-    ld a, (var_int_counter+1)      ; (13) if (int_counter != int_counter_last) then stop loop
+    ld a, (var_int_counter)        ; (13) if (int_counter != int_counter_last) then stop loop
     cp d                           ; (4)
     jp z, .loop                    ; (10)
 .check_int_too_long:
     xor a                          ; if (counter < 0x100) - assume int problem
     or b                           ; ...
     jr nz, .int_ok                 ; ...
-    ld (ix+0), #00                 ; trying to fix it - insert additional nops
+    ld (ix+2), #c9                 ; trying to fix it - insert additional nops // #c9 - ret
     ld (ix+1), #fb                 ; ... ei
-    ld (ix+2), #c9                 ; ... ret
+    ld (ix+0), #00                 ; ... nop
     inc ix                         ;
     jr .enter                      ;
 .int_ok:

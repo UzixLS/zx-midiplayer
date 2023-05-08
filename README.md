@@ -26,6 +26,3 @@ You may use addon with builtin MIDI synthesizer or connect an external one to yo
 - Implement DivMMC, ZXMMC and Z-Controller support
 - Correctly handle TRDOS-less environment
 - Handle last entry in playlist
-- Fix too fast playing
-- Fix too slow playing
-- Fix trdos break key

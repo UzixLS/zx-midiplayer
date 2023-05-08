@@ -115,5 +115,55 @@ uart_putc:
 .E: ld e, 6            ; (7) Delay for 101 T-states (28.5us). Self modifying code! See uart_patch_for_cpu_*
 1:  dec e              ; (4)
     jr nz, 1b          ; (12/7)
-
     ret                ; (10)
+
+
+; IN  -  A - byte to put into tx buffer
+; OUT -  F - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+uart_putc_txbuf:
+    push hl                     ;
+    ld hl, uart_txbuf_len       ;
+    ld c, (hl)                  ;
+    inc (hl)                    ; txbuf_len++
+    jp p, .put                  ; if (txbuf_len > 127) flush txbuf
+.overflow:
+    ld (hl), 1                  ;
+    push af                     ;
+    push ix                     ;
+    ld ixl, 127                 ;
+    call uart_flush_txbuf.enter ;
+    pop ix                      ;
+    pop af                      ;
+    ld c, 0                     ;
+.put:
+    ld b, 0                     ;
+    ld hl, uart_txbuf           ;
+    add hl, bc                  ;
+    ld (hl), a                  ; txbuf[txbuf_len_initial] = A
+    pop hl                      ;
+    ret                         ;
+
+
+; OUT - AF  - garbage
+; OUT - BC  - garbage
+; OUT - DE  - garbage
+; OUT - HL  - garbage
+; OUT - IXL - garbage
+uart_flush_txbuf:
+    ld a, (uart_txbuf_len)   ;
+    or a                     ;
+    ret z                    ;
+    ld ixl, a                ;
+    xor a                    ;
+    ld (uart_txbuf_len), a   ;
+.enter:
+    ld hl, uart_txbuf        ;
+.loop:                       ;
+    ld a, (hl)               ;
+    di : call uart_putc : ei ;
+    inc hl                   ;
+    dec ixl                  ;
+    jp nz, .loop             ;
+    ret                      ;

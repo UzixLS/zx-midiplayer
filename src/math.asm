@@ -7,7 +7,7 @@
 ; OUT - DE   - divisor
 ; OUT - HL   - remainder
 ; OUT - B    - 0
-div32by16:
+div_acix_de:
     ld hl, 0
     ld b, 32
 .loop:
