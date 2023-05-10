@@ -24,69 +24,79 @@
 
 
 ; === TRD file ===
+ramtop equ #5fb3
+    assert begin > ramtop
+    assert ramtop - boot_b.end > 255
     org #5d3b
 boot_b:
-    dw #0100, .end-$-4, #30fd,#000e,#b300,#005f,#f93a,#30c0,#000e,#5300,#005d,#ea3a
+    dw #0100, .end-$-4                    ; basic line number and length
+    db #fd, '0'                           ; CLEAR 0 (ramtop)
+    db #0e, #00, #00 : dw ramtop : db #00 ; ...
+    db ':'                                ;
+    db #f9, #c0, '0'                      ; RANDOMIZE USR 0 (.enter)
+    db #0e, #00, #00 : dw .enter : db #00 ; ...
+    db ':'                                ;
+    db #ea                                ; REM
 .enter:
-    di                                ;
+    di                                    ;
 
-    ld hl, #8000                      ;
-    ld b, screen_sectors              ;
-    call .sub_load                    ;
-    ld hl, #8000                      ;
-    ld de, #4000                      ; screen_start
-    call .sub_unpack                  ;
-    xor a                             ; set black border
-    out (#fe), a                      ; ...
-    ld a, #10 + screen0_page          ; screen_menu
-    ld bc, #7ffd                      ;
-    out (c), a                        ;
-    ld de, screen0                    ;
-    call .sub_unpack                  ;
-    call .sub_unpack                  ; screen_play
+    ld hl, #8000                          ;
+    ld b, screen_sectors                  ;
+    call .sub_load                        ;
+    ld hl, #8000                          ;
+    ld de, #4000                          ; screen_start
+    call .sub_unpack                      ;
+    xor a                                 ; set black border
+    out (#fe), a                          ; ...
+    ld a, #10 + screen0_page              ; screen_menu
+    ld bc, #7ffd                          ;
+    out (c), a                            ;
+    ld de, screen0                        ;
+    call .sub_unpack                      ;
+    call .sub_unpack                      ; screen_play
 
-    ld a, #10                         ; code
-    ld bc, #7ffd                      ;
-    out (c), a                        ;
-    ld hl, #c000                      ;
-    ld b, code_sectors                ;
-    call .sub_load                    ;
-    ld hl, #c000                      ;
-    ld de, begin                      ;
-    call .sub_unpack                  ;
+    ld a, #10                             ; code
+    ld bc, #7ffd                          ;
+    out (c), a                            ;
+    ld hl, #c000                          ;
+    ld b, code_sectors                    ;
+    call .sub_load                        ;
+    ld hl, #c000                          ;
+    ld de, begin                          ;
+    call .sub_unpack                      ;
 
-    jp main                           ;
+    jp main                               ;
 
 ; IN - HL - destination address
 ; IN - B  - sectors count
 .sub_load:
-    ld de, (#5cf4)          ;
-    ld c, #05               ;
-    jp #3d13                ;
+    ld de, (#5cf4)                        ;
+    ld c, #05                             ;
+    jp #3d13                              ;
 
 ; IN  - DE - destination
 ; IN  - HL - source
 ; OUT - DE - pointer to next untouched byte at dest
 ; OUT - HL - pointer to next byte after unpacked block
 .sub_unpack:
-    ld b, 1                 ;
-    ld a, (hl)              ;
-    inc hl                  ;
-    cp (hl)                 ;
-    jr nz, .fill            ;
-    inc hl                  ;
-    ld b, (hl)              ;
-    inc hl                  ;
-    inc b                   ;
-    ret z                   ;
-    inc b                   ;
+    ld b, 1                               ;
+    ld a, (hl)                            ;
+    inc hl                                ;
+    cp (hl)                               ;
+    jr nz, .fill                          ;
+    inc hl                                ;
+    ld b, (hl)                            ;
+    inc hl                                ;
+    inc b                                 ;
+    ret z                                 ;
+    inc b                                 ;
 .fill:
-    ld (de), a              ;
-    inc de                  ;
-    djnz .fill              ;
-    jp .sub_unpack          ;
+    ld (de), a                            ;
+    inc de                                ;
+    djnz .fill                            ;
+    jp .sub_unpack                        ;
 
-    db #0d
+    db #0d                                ; basic line end
 .end:
 
     page 0
