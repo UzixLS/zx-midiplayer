@@ -30,6 +30,26 @@ div_acix_de:
     ret
 
 
+; IN  - AC - dividend
+; IN  - DE - divisor
+; OUT - AC - quotient
+; OUT - HL - remainder
+; OUT - BC - garbage
+div_ac_de:
+   ld hl, 0
+   ld b, 16
+.loop:
+   sll c
+   rla
+   adc hl, hl
+   sbc hl, de
+   jr nc, $+4
+   add hl, de
+   dec c
+   djnz .loop
+   ret
+
+
 ; IN  - DE
 ; IN  - BC
 ; OUT - DEHL

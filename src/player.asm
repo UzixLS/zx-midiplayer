@@ -101,6 +101,7 @@ player_loop:
 .next_track:
     call smf_get_next_track        ;
     jp nz, .process_current_track  ;
+    call smf_next_int              ;
     jp .loop                       ;
 .ff_sub:
     ld a, 1                        ;
