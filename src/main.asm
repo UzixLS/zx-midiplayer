@@ -85,6 +85,16 @@ exit:
     rst 0        ;
 
 
+help:
+    call screen_select_help ;
+.loop:
+    halt                    ;
+    call input_process      ;
+    ld a, (var_input_key)   ;
+    cp INPUT_KEY_BACK       ;
+    jr nz, .loop            ;
+    jp screen_redraw        ;
+
 
 menu_main_file_toggle:
     ld a, (var_current_menu)      ;
@@ -169,13 +179,19 @@ main_menu_callback:
     ld a, e                     ;
 .bdi_drive:
     cp 3+1                      ;
-    jr nc, .exit                ;
+    jr nc, .help                ;
     ld (var_current_drive), a   ;
     call file_load_catalogue    ;
     ld iy, file_menu            ;
     call menu_init              ;
     call menu_draw              ;
     call menu_main_file_toggle  ;
+    ret
+.help:
+    cp 4                        ;
+    jr nz, .exit                ;
+    call help                   ;
+    ret                         ;
 .exit:
     cp 5                        ;
     jr nz, .unhandled_menu_item ;
@@ -217,6 +233,7 @@ main_menu_generator:
 .entries_count = ($-.entries)/2
 
 
+    include "rle_unpack.asm"
     include "input.asm"
     include "menu.asm"
     include "file.asm"

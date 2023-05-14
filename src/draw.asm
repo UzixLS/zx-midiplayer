@@ -31,8 +31,8 @@ clear_screen:
 
 
 ; Clear screen pixel area routine
-; IN  - B   - lines count [0..23]
-; IN  - C   - width columns [1..31]
+; IN  - B   - lines count [0..24]
+; IN  - C   - width columns [1..32]
 ; IN  - H   - Y [0..23]
 ; IN  - L   - X [0..31]
 ; OUT - AF  - garbage
@@ -46,8 +46,8 @@ clear_screen_area_at:
     ; fall through to clear_screen_area ...
 
 ; Clear screen pixel area routine
-; IN  - B   - lines count [0..191]
-; IN  - C   - width columns [1..31]
+; IN  - B   - lines count [0..192]
+; IN  - C   - width columns [1..32]
 ; IN  - H   - Y [0..191]
 ; IN  - L   - X [0..255]
 ; OUT - AF  - garbage

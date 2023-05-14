@@ -8,15 +8,22 @@
 
 
 ; === SNA file ===
+    page screens_page
+    org screens_base
     lua allpass
+        sj.add_word(0)
+        sj.add_word(_c("menu_scr_sna"))
+        sj.add_word(_c("play_scr_sna"))
+        sj.add_word(_c("help_scr_sna"))
+        sj.insert_label("menu_scr_sna", sj.current_address); incbin_rle("res/menu.scr")
+        sj.insert_label("play_scr_sna", sj.current_address); incbin_rle("res/play.scr")
+        sj.insert_label("help_scr_sna", sj.current_address); incbin_rle("res/help.scr")
+
         incbin_pages("res/start.scr",  0, nil, 0x4000, {0})
-        incbin_pages("res/menu.scr",   0, nil, 0xC000, {7})
-        incbin_pages("res/play.scr",   0, nil, 0xC000+6912, {7})
         incbin_pages("build/main.bin", 0, nil, _c("begin"), {0})
         incbin_pages("res/test0.mid",  0, nil, 0xC000, {0,4,6,3})
     endlua
     page 0 : savesna "main.sna", main
-
 
 ; === TAP file ===
     emptytap "main.tap"
@@ -26,10 +33,10 @@
 ; === TRD file ===
 ramtop equ #5fb3
     assert begin > ramtop
-    assert ramtop - boot_b.end > 255
+    assert ramtop - boot_b_end > 255
     org #5d3b
 boot_b:
-    dw #0100, .end-$-4                    ; basic line number and length
+    dw #0100, boot_b_end-$-4              ; basic line number and length
     db #fd, '0'                           ; CLEAR 0 (ramtop)
     db #0e, #00, #00 : dw ramtop : db #00 ; ...
     db ':'                                ;
@@ -39,32 +46,26 @@ boot_b:
     db #ea                                ; REM
 .enter:
     di                                    ;
-
-    ld hl, #8000                          ;
-    ld b, screen_sectors                  ;
-    call .sub_load                        ;
-    ld hl, #8000                          ;
-    ld de, #4000                          ; screen_start
-    call .sub_unpack                      ;
+    ld a, #10 + screens_page              ; load all screens, they will be unpacked on demand
+    ld bc, #7ffd                          ; ...
+    out (c), a                            ; ...
+    ld hl, screens_base                   ; ...
+    ld b, screen_sectors                  ; ...
+    call .sub_load                        ; ...
+    ld hl, start_scr_trd                  ; unpack startup screen
+    ld de, #4000                          ; ...
+    call rle_unpack                       ; ...
     xor a                                 ; set black border
     out (#fe), a                          ; ...
-    ld a, #10 + screen0_page              ; screen_menu
-    ld bc, #7ffd                          ;
-    out (c), a                            ;
-    ld de, screen0                        ;
-    call .sub_unpack                      ;
-    call .sub_unpack                      ; screen_play
-
     ld a, #10                             ; code
-    ld bc, #7ffd                          ;
-    out (c), a                            ;
-    ld hl, #c000                          ;
-    ld b, code_sectors                    ;
-    call .sub_load                        ;
-    ld hl, #c000                          ;
-    ld de, begin                          ;
-    call .sub_unpack                      ;
-
+    ld bc, #7ffd                          ; ... load
+    out (c), a                            ; ...
+    ld hl, #c000                          ; ...
+    ld b, code_sectors                    ; ...
+    call .sub_load                        ; ...
+    ld hl, #c000                          ; ... and unpack
+    ld de, begin                          ; ...
+    call rle_unpack                       ; ...
     jp main                               ;
 
 ; IN - HL - destination address
@@ -74,40 +75,25 @@ boot_b:
     ld c, #05                             ;
     jp #3d13                              ;
 
-; IN  - DE - destination
-; IN  - HL - source
-; OUT - DE - pointer to next untouched byte at dest
-; OUT - HL - pointer to next byte after unpacked block
-.sub_unpack:
-    ld b, 1                               ;
-    ld a, (hl)                            ;
-    inc hl                                ;
-    cp (hl)                               ;
-    jr nz, .fill                          ;
-    inc hl                                ;
-    ld b, (hl)                            ;
-    inc hl                                ;
-    inc b                                 ;
-    ret z                                 ;
-    inc b                                 ;
-.fill:
-    ld (de), a                            ;
-    inc de                                ;
-    djnz .fill                            ;
-    jp .sub_unpack                        ;
+    include "rle_unpack.asm"
 
     db #0d                                ; basic line end
-.end:
+boot_b_end:
 
     page 0
     emptytrd "main.trd", "ZXMIDI"
-    savetrd "main.trd", "boot.B", boot_b, boot_b.end-boot_b
+    savetrd "main.trd", "boot.B", boot_b, boot_b_end-boot_b
 
     org 0
     lua allpass
-        incbin_rle("res/start.scr")
-        incbin_rle("res/menu.scr")
-        incbin_rle("res/play.scr")
+        sj.add_word(_c("start_scr_trd"))
+        sj.add_word(_c("menu_scr_trd"))
+        sj.add_word(_c("play_scr_trd"))
+        sj.add_word(_c("help_scr_trd"))
+        sj.insert_label("start_scr_trd", sj.current_address + _c("screens_base")); incbin_rle("res/start.scr")
+        sj.insert_label("menu_scr_trd",  sj.current_address + _c("screens_base")); incbin_rle("res/menu.scr")
+        sj.insert_label("play_scr_trd",  sj.current_address + _c("screens_base")); incbin_rle("res/play.scr")
+        sj.insert_label("help_scr_trd",  sj.current_address + _c("screens_base")); incbin_rle("res/help.scr")
         sj.insert_label("screen_sectors", math.ceil(sj.current_address/256))
     endlua
     assert $ < #4000

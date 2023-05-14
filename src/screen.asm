@@ -1,30 +1,36 @@
-screen_size  equ 6912
-screen0      equ #C000
-screen0_page equ 7
-screen1      equ screen0 + screen_size
-screen1_page equ 7
+screen_size     equ 6912
+screens_base    equ #C000
+screens_page    equ 7
+screen_menu_ptr equ #C002
+screen_play_ptr equ #C004
+screen_help_ptr equ #C006
 
     export screen_size
-    export screen0
-    export screen1
-    export screen0_page
-    export screen1_page
+    export screens_base
+    export screens_page
+
+
+; IN - IX - pointer to memory address where screen data address is stored
+screen_load:
+    ld a, #10 + screens_page                  ;
+    ld bc, #7ffd                              ;
+    out (c), a                                ;
+    ld h, (ix+1)                              ;
+    ld l, (ix+0)                              ;
+    ld de, #4000                              ;
+    call rle_unpack                           ;
+    ld a, #10                                 ;
+    ld bc, #7ffd                              ;
+    out (c), a                                ;
+    ret
 
 
 screen_select_menu:
     ld hl, .load                              ;
     ld (var_screen_proc_addr), hl             ;
 .load:
-    ld a, #10 + screen0_page                  ;
-    ld bc, #7ffd                              ;
-    out (c), a                                ;
-    ld de, #4000                              ;
-    ld hl, screen0                            ;
-    ld bc, screen_size                        ;
-    ldir                                      ;
-    ld a, #10                                 ;
-    ld bc, #7ffd                              ;
-    out (c), a                                ;
+    ld ix, screen_menu_ptr                    ;
+    call screen_load                          ;
 .print:
     LD_SCREEN_ADDRESS hl, LAYOUT_HEAD         ;
     ld ix, str_head                           ;
@@ -59,16 +65,8 @@ screen_select_player:
     ld hl, .load                              ;
     ld (var_screen_proc_addr), hl             ;
 .load:
-    ld a, #10 + screen1_page                  ;
-    ld bc, #7ffd                              ;
-    out (c), a                                ;
-    ld de, #4000                              ;
-    ld hl, screen1                            ;
-    ld bc, screen_size                        ;
-    ldir                                      ;
-    ld a, #10                                 ;
-    ld bc, #7ffd                              ;
-    out (c), a                                ;
+    ld ix, screen_play_ptr                    ;
+    call screen_load                          ;
 .print:
     LD_SCREEN_ADDRESS hl, LAYOUT_HEAD         ;
     ld ix, str_head                           ;
@@ -81,6 +79,15 @@ screen_select_player:
     call print_string0                        ;
     LD_SCREEN_ADDRESS hl, LAYOUT_TIME_MINUTES ;
     ld ix, str_zerotime                       ;
+    call print_string0                        ;
+    ret                                       ;
+
+
+screen_select_help:
+    ld ix, screen_help_ptr                    ;
+    call screen_load                          ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_HEAD         ;
+    ld ix, str_head                           ;
     call print_string0                        ;
     ret                                       ;
 
