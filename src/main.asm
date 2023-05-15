@@ -28,11 +28,11 @@ variables0_end:
 
     org #7f7f
 int_handler:
-    push af
-    ld a, (var_int_counter)
-    inc a
-    ld (var_int_counter), a
-    pop af
+    push af                   ;
+    ld a, (var_int_counter)   ;
+    inc a                     ;
+    ld (var_int_counter), a   ;
+    pop af                    ;
 .A: ei                        ; (1 byte) self modifying code! see device_detect_cpu_int
     ret                       ; (1 byte) ...
 
@@ -86,14 +86,63 @@ exit:
 
 
 help:
-    call screen_select_help ;
-.loop:
-    halt                    ;
-    call input_process      ;
-    ld a, (var_input_key)   ;
-    cp INPUT_KEY_BACK       ;
-    jr nz, .loop            ;
-    jp screen_redraw        ;
+    call screen_select_help                   ;
+.patch_int:
+    ld a, (int_handler)                       ;
+    push af                                   ;
+    ld a, #c9                                 ; ret
+    ld (int_handler), a                       ;
+.patch_for_machine                            ;
+    ld a, (var_lines_after_int_before_screen) ;
+    add 121-1                                 ; 121th line on image - 1 line of correction
+    ld (.A+1), a                              ;
+    ld a, (var_horizontal_align+0)            ;
+    ld (.B+1), a                              ;
+    ld a, (var_horizontal_align+1)            ;
+    ld (.B+2), a                              ;
+    ld a, (var_tstates_per_line+0) : ld l, a  ;
+    ld a, (var_tstates_per_line+1) : ld h, a  ;
+    push hl                                   ;
+    ld bc, -24                                ; number of tstates, see .border_lines_loop
+    add hl, bc                                ;
+    ld a, l : ld (.C+1), a                    ;
+    ld a, h : ld (.C+2), a                    ;
+    pop hl                                    ;
+    ld bc, -64                                ; number of tstates, see .border_lines_loop
+    add hl, bc                                ;
+    ld a, l : ld (.D+1), a                    ;
+    ld a, h : ld (.D+2), a                    ;
+.loop:                                        ;
+    ld e, 5                                   ;
+.A  ld d, 0                                   ; self modifying code! See above
+.B  ld hl, 0                                  ; self modifying code! See above
+    ei : halt                                 ;
+    call delay_tstate         ; (hl)          ; delay to align to next line beginning
+.border_lines_loop:
+.C  ld hl, 0                  ; (10)          ; 24 + HL T-states * D. Self modifying code! See above
+    call delay_tstate         ; (hl)          ; ...
+    dec d                     ; (4)           ; ...
+    jp nz, .border_lines_loop ; (10)          ; ...
+    ld a, LAYOUT_HELP_BORDER  ; (7)           ; 64 + HL T-states
+    out (#fe), a              ; (11)          ; ...
+.D  ld hl, 0                  ; (10)          ; ... self modifying code! See above
+    call delay_tstate         ; (hl)          ; ...
+    xor a                     ; (4)           ; ...
+    dec e                     ; (4)           ; ...
+    ld d, 7                   ; (7)           ; ...
+    out (#fe), a              ; (11)          ; ...
+    jp nz, .border_lines_loop ; (10)          ; ...
+.process:
+    call input_process                        ;
+    ld a, (var_input_key)                     ;
+    cp INPUT_KEY_BACK                         ;
+    jr nz, .loop                              ;
+.unpatch_int:
+    pop af                                    ;
+    ld (int_handler), a                       ;
+    ei                                        ;
+.exit
+    jp screen_redraw                          ;
 
 
 menu_main_file_toggle:
@@ -234,6 +283,7 @@ main_menu_generator:
 
 
     include "rle_unpack.asm"
+    include "delay_tstate.asm"
     include "input.asm"
     include "menu.asm"
     include "file.asm"

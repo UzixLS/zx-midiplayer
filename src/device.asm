@@ -1,31 +1,53 @@
 device_detect_cpu_int:
-    ld ix, int_handler.A
+    ld ix, int_handler.A                      ;
 .enter:
-    ld bc, 0                       ; counter = 0
-    ei : halt                      ;
-    ld a, (var_int_counter)        ; D = int_counter+1
-    inc a                          ; ...
-    ld d, a                        ; ...
-    ei : halt                      ;
-.loop:                             ; 33 T-states
-    inc bc                         ; (6) counter++
-    ld a, (var_int_counter)        ; (13) if (int_counter != int_counter_last) then stop loop
-    cp d                           ; (4)
-    jp z, .loop                    ; (10)
+    ld bc, 0                                  ; counter = 0
+    ei : halt                                 ;
+    ld a, (var_int_counter)                   ; D = int_counter+1
+    inc a                                     ; ...
+    ld d, a                                   ; ...
+    ei : halt                                 ;
+.counter_loop                                 ; 33 T-states
+    inc bc                                    ; (6) counter++
+    ld a, (var_int_counter)                   ; (13) if (int_counter != int_counter_last) then stop loop
+    cp d                                      ; (4)
+    jp z, .counter_loop                       ; (10)
 .check_int_too_long:
-    xor a                          ; if (counter < 0x100) - assume int problem
-    or b                           ; ...
-    jr nz, .int_ok                 ; ...
-    ld (ix+2), #c9                 ; trying to fix it - insert additional nops // #c9 - ret
-    ld (ix+1), #fb                 ; ... ei
-    ld (ix+0), #00                 ; ... nop
-    inc ix                         ;
-    jr .enter                      ;
+    xor a                                     ; if (counter < 0x100) - assume int problem
+    or b                                      ; ...
+    jr nz, .int_ok                            ; ...
+    ld (ix+2), #c9                            ; trying to fix it - insert additional nops // #c9 - ret
+    ld (ix+1), #fb                            ; ... ei
+    ld (ix+0), #00                            ; ... nop
+    inc ix                                    ;
+    jr .enter                                 ;
 .int_ok:
-    call .sub                      ; D = cpu_freq, E = int_type
-    ld a, d : ld (var_cpu_freq), a ; save
-    ld a, e : ld (var_int_type), a ; ...
+    ld ix, .table-9                           ; foreach entry in table
+    ld de, 9                                  ;
+.table_loop:
+    add ix, de                                ;
+    ld l, (ix+0)                              ;
+    ld h, (ix+1)                              ;
+    sbc hl, bc                                ; compare counter
+    jr c, .table_loop                         ;
+.match:
+    ld a, (ix+2)                              ;
+    ld (var_cpu_freq), a                      ;
+    ld a, (ix+3)                              ;
+    ld (var_int_type), a                      ;
+    ld a, (ix+4)                              ;
+    ld (var_tstates_per_line+0), a            ;
+    ld a, (ix+5)                              ;
+    ld (var_tstates_per_line+1), a            ;
+    ld a, (ix+6)                              ;
+    ld (var_lines_after_int_before_screen), a ;
+    ld a, (ix+7)                              ;
+    ld (var_horizontal_align+0), a            ;
+    ld a, (ix+8)                              ;
+    ld (var_horizontal_align+1), a            ;
 .debug:
+    ; ld d, (ix+2)
+    ; ld e, (ix+3)
     ; push de
     ; push bc
     ; ld hl, LAYOUT_DEBUG
@@ -45,7 +67,7 @@ device_detect_cpu_int:
     ; jp device_detect_cpu_int
     ret
 
-.sub:
+.table:
     ; timings    CPU-freq T-states Int-freq   Counter  Comment
     ; 48K        3.5      69888    50.08      0845
     ; 128K       3.5469   70908    50.02      0864     real 128k
@@ -59,15 +81,17 @@ device_detect_cpu_int:
     ; 48K        28       559104   50.08      422e
     ; 128K       28       567264   49.36      4324     all known machines with turbo and 128K timings are 3.5x-based
     ; Pentagon   28       573440   48.828125  43e0
-1:  ld hl,#0845+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_3_5_MHZ  << 8) | INT_50_HZ   : ret
-1:  ld hl,#0864+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_3_54_MHZ << 8) | INT_50_HZ   : ret
-1:  ld hl,#087c+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_3_5_MHZ  << 8) | INT_48_8_HZ : ret
-1:  ld hl,#108b+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_7_MHZ    << 8) | INT_50_HZ   : ret
-1:  ld hl,#10c9+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_7_MHZ    << 8) | INT_50_HZ   : ret
-1:  ld hl,#10f8+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_7_MHZ    << 8) | INT_48_8_HZ : ret
-1:  ld hl,#2117+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_14_MHZ   << 8) | INT_50_HZ   : ret
-1:  ld hl,#2192+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_14_MHZ   << 8) | INT_50_HZ   : ret
-1:  ld hl,#21f0+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_14_MHZ   << 8) | INT_48_8_HZ : ret
-1:  ld hl,#422e+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_28_MHZ   << 8) | INT_50_HZ   : ret
-1:  ld hl,#4324+10 : sbc hl,bc : jr c,1f :   ld de, (CPU_FREQ_28_MHZ   << 8) | INT_50_HZ   : ret
-1:/*ld hl,#43e0+10 : sbc hl,bc : jr c,1f :*/ ld de, (CPU_FREQ_28_MHZ   << 8) | INT_48_8_HZ : ret
+    ; counter     cpu                     int               tstates_per_line lines_after_int_before_screen horizontal_align
+    dw #0845+10 : db CPU_FREQ_3_5_MHZ   : db INT_50_HZ    : dw 224         : db 64                       : dw 141
+    dw #0864+10 : db CPU_FREQ_3_54_MHZ  : db INT_50_HZ    : dw 228         : db 63                       : dw 141
+    dw #087c+10 : db CPU_FREQ_3_5_MHZ   : db INT_48_8_HZ  : dw 224         : db 80                       : dw 210
+    dw #108b+10 : db CPU_FREQ_7_MHZ     : db INT_50_HZ    : dw 448         : db 64                       : dw 302
+    dw #10c9+10 : db CPU_FREQ_7_MHZ     : db INT_50_HZ    : dw 456         : db 63                       : dw 302
+    dw #10f8+10 : db CPU_FREQ_7_MHZ     : db INT_48_8_HZ  : dw 448         : db 80                       : dw 440
+    dw #2117+10 : db CPU_FREQ_14_MHZ    : db INT_50_HZ    : dw 896         : db 64                       : dw 624
+    dw #2192+10 : db CPU_FREQ_14_MHZ    : db INT_50_HZ    : dw 912         : db 63                       : dw 624
+    dw #21f0+10 : db CPU_FREQ_14_MHZ    : db INT_48_8_HZ  : dw 896         : db 80                       : dw 900
+    dw #422e+10 : db CPU_FREQ_28_MHZ    : db INT_50_HZ    : dw 1792        : db 64                       : dw 1448
+    dw #4324+10 : db CPU_FREQ_28_MHZ    : db INT_50_HZ    : dw 1824        : db 63                       : dw 1448
+    dw #43e0+10 : db CPU_FREQ_28_MHZ    : db INT_48_8_HZ  : dw 1792        : db 80                       : dw 2000
+    dw #ffff    : db CPU_FREQ_28_MHZ    : db INT_48_8_HZ  : dw 1792        : db 80                       : dw 2000    ; fallback entry
