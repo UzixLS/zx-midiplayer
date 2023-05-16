@@ -25,6 +25,7 @@ data          BLOCK 0
 
     STRUCT smf_file_t
 num_tracks             BYTE
+num_tracks_play        BYTE
 ppqn                   WORD
 tempo                  DWORD
 ticks_per_int          WORD
@@ -92,7 +93,9 @@ smf_parse_file_header:
     call file_get_next_byte :                                  ; chunk_mthd_t.format[1]
     or 1 : cp 1 : ret nz                                       ; if (format != 0 && format != 1) - return error
     call file_get_next_byte : cp 0   : ret nz                  ; chunk_mthd_t.num_tracks[0]
-    call file_get_next_byte : ld (var_smf_file.num_tracks), a  ; chunk_mthd_t.num_tracks[1]
+    call file_get_next_byte                                    ; chunk_mthd_t.num_tracks[1]
+    ld (var_smf_file.num_tracks), a                            ; ...
+    ld (var_smf_file.num_tracks_play), a                       ; ...
     cp SMF_MAX_TRACKS                                          ; if (num_tracks>SMF_MAX_TRACKS) - return error
     jp c, 1f : jp z, 1f                                        ; ...
     or 1                                                       ; reset Z flag
@@ -399,8 +402,8 @@ smf_get_next_status:
 ; IN  - IY - pointer to smf_track_t
 ; OUT -  F - C=1 when delay is going on; C=0 when delay is expired
 ; OUT -  F - Z=1 when no more data on this track; Z=0 when ok
-; OUT -  A - status byte (only when F/C=0)
-; OUT - BC - data len (only when F/C=0)
+; OUT -  A - status byte (only when F/C=0 and F/Z=0)
+; OUT - BC - data len (only when F/C=0 and F/Z=0)
 ; OUT - HL - next track position
 ; OUT - DE - garbage
 ; OUT - IX - garbage
@@ -436,8 +439,8 @@ smf_process_track:
     or a                                              ; clear C flag
     sbc hl, de                                        ; if (HL==DE) Z=1,C=0; if (HL<DE) Z=0,C=1; if (HL>DE) Z=0,C=0
     ex hl, de                                         ; ...
-    jr z, .end_of_file                                ; ...
-    jr c, .end_of_file                                ; ...
+    jr z, .end_of_track                               ; ...
+    jr c, .end_of_track                               ; ...
 .get_delay:
     call smf_parse_varint                             ; DEBC = time delta (ticks count)
     ld a, b : or c : or d : or e                      ; check if delay == 0
@@ -446,8 +449,12 @@ smf_process_track:
     call smf_set_delay                                ; else - calculate and save delay
     pop hl                                            ;
     jp .check_delay                                   ; delay may be already expired
-.end_of_file:
+.end_of_track:
     res SMF_TRACK_FLAGS_PLAY, (iy+smf_track_t.flags)  ; clear play flag
+    ld a, (var_smf_file.num_tracks_play)              ; num_tracks_play--
+    dec a                                             ; ...
+    ld (var_smf_file.num_tracks_play), a              ; ...
+    call player_set_tracks                            ; ...
     xor a                                             ; set Z flag
     ret                                               ;
 
