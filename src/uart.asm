@@ -9,13 +9,13 @@ uart_init:
     ld a, #fc                        ;
     out (c), a                       ; Enable port A output.
     ld a, (var_cpu_freq)             ; if (cpu frequency != 3.5MHz) then patch code for it
-    cp CPU_FREQ_28_MHZ               ;
+    cp CPU_28_MHZ                    ;
     jp z, uart_patch_for_cpu_28mhz   ;
-    cp CPU_FREQ_14_MHZ               ;
+    cp CPU_14_MHZ                    ;
     jp z, uart_patch_for_cpu_14mhz   ;
-    cp CPU_FREQ_7_MHZ                ;
+    cp CPU_7_MHZ                     ;
     jp z, uart_patch_for_cpu_7mhz    ;
-    cp CPU_FREQ_3_54_MHZ             ;
+    cp CPU_3_54_MHZ                  ;
     jp z, uart_patch_for_cpu_3_54mhz ;
     ret                              ; ...
 

@@ -22,8 +22,8 @@ device_detect_cpu_int:
     inc ix                                    ;
     jr .enter                                 ;
 .int_ok:
-    ld ix, .table-9                           ; foreach entry in table
-    ld de, 9                                  ;
+    ld ix, .table-11                          ; foreach entry in table
+    ld de, 11                                 ;
 .table_loop:
     add ix, de                                ;
     ld l, (ix+0)                              ;
@@ -45,6 +45,10 @@ device_detect_cpu_int:
     ld (var_horizontal_align+0), a            ;
     ld a, (ix+8)                              ;
     ld (var_horizontal_align+1), a            ;
+    ld a, (ix+9)                              ;
+    ld (var_us_per_int+0), a                  ;
+    ld a, (ix+10)                             ;
+    ld (var_us_per_int+1), a                  ;
 .debug:
     ; ld d, (ix+2)
     ; ld e, (ix+3)
@@ -81,17 +85,17 @@ device_detect_cpu_int:
     ; 48K        28       559104   50.08      422e
     ; 128K       28       567264   49.36      4324     all known machines with turbo and 128K timings are 3.5x-based
     ; Pentagon   28       573440   48.828125  43e0
-    ; counter     cpu                     int               tstates_per_line lines_after_int_before_screen horizontal_align
-    dw #0845+10 : db CPU_FREQ_3_5_MHZ   : db INT_50_HZ    : dw 224         : db 64                       : dw 141
-    dw #0864+10 : db CPU_FREQ_3_54_MHZ  : db INT_50_HZ    : dw 228         : db 63                       : dw 141
-    dw #087c+10 : db CPU_FREQ_3_5_MHZ   : db INT_48_8_HZ  : dw 224         : db 80                       : dw 210
-    dw #108b+10 : db CPU_FREQ_7_MHZ     : db INT_50_HZ    : dw 448         : db 64                       : dw 302
-    dw #10c9+10 : db CPU_FREQ_7_MHZ     : db INT_50_HZ    : dw 456         : db 63                       : dw 302
-    dw #10f8+10 : db CPU_FREQ_7_MHZ     : db INT_48_8_HZ  : dw 448         : db 80                       : dw 440
-    dw #2117+10 : db CPU_FREQ_14_MHZ    : db INT_50_HZ    : dw 896         : db 64                       : dw 624
-    dw #2192+10 : db CPU_FREQ_14_MHZ    : db INT_50_HZ    : dw 912         : db 63                       : dw 624
-    dw #21f0+10 : db CPU_FREQ_14_MHZ    : db INT_48_8_HZ  : dw 896         : db 80                       : dw 900
-    dw #422e+10 : db CPU_FREQ_28_MHZ    : db INT_50_HZ    : dw 1792        : db 64                       : dw 1448
-    dw #4324+10 : db CPU_FREQ_28_MHZ    : db INT_50_HZ    : dw 1824        : db 63                       : dw 1448
-    dw #43e0+10 : db CPU_FREQ_28_MHZ    : db INT_48_8_HZ  : dw 1792        : db 80                       : dw 2000
-    dw #ffff    : db CPU_FREQ_28_MHZ    : db INT_48_8_HZ  : dw 1792        : db 80                       : dw 2000    ; fallback entry
+    ; counter     cpu                int             tstates_per_line lines_before_screen horizontal_align us_per_int
+    dw #0845+10 : db CPU_3_5_MHZ   : db INT_50_HZ  : dw 224         : db 64             : dw 141         : dw 19968
+    dw #0864+10 : db CPU_3_54_MHZ  : db INT_50_HZ  : dw 228         : db 63             : dw 141         : dw 19992
+    dw #087c+10 : db CPU_3_5_MHZ   : db INT_48_HZ  : dw 224         : db 80             : dw 210         : dw 20480
+    dw #108b+10 : db CPU_7_MHZ     : db INT_50_HZ  : dw 448         : db 64             : dw 302         : dw 19968
+    dw #10c9+10 : db CPU_7_MHZ     : db INT_49_HZ  : dw 456         : db 63             : dw 302         : dw 20259
+    dw #10f8+10 : db CPU_7_MHZ     : db INT_48_HZ  : dw 448         : db 80             : dw 440         : dw 20480
+    dw #2117+10 : db CPU_14_MHZ    : db INT_50_HZ  : dw 896         : db 64             : dw 624         : dw 19968
+    dw #2192+10 : db CPU_14_MHZ    : db INT_49_HZ  : dw 912         : db 63             : dw 624         : dw 20259
+    dw #21f0+10 : db CPU_14_MHZ    : db INT_48_HZ  : dw 896         : db 80             : dw 900         : dw 20480
+    dw #422e+10 : db CPU_28_MHZ    : db INT_50_HZ  : dw 1792        : db 64             : dw 1448        : dw 19968
+    dw #4324+10 : db CPU_28_MHZ    : db INT_49_HZ  : dw 1824        : db 63             : dw 1448        : dw 20259
+    dw #43e0+10 : db CPU_28_MHZ    : db INT_48_HZ  : dw 1792        : db 80             : dw 2000        : dw 20480
+    dw #ffff    : db CPU_28_MHZ    : db INT_48_HZ  : dw 1792        : db 80             : dw 2000        : dw 20480  ; fallback entry

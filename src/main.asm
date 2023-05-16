@@ -56,7 +56,6 @@ main:
     out (c), a                      ; ...
     call device_detect_cpu_int      ;
     call uart_init                  ;
-    call smf_init                   ;
     call input_detect_kempston      ;
     ld iy, main_menu                ;
     call menu_init                  ;

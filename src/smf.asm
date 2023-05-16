@@ -291,7 +291,7 @@ smf_update_ticks_per_int:                                ; ticks_per_int = int_l
     jp z, 1f                                             ; ...
     ld ix, #ffff                                         ; ...
 1:  ld d, ixh : ld e, ixl                                ; ...
-.A  ld bc, 0 : ld a, b                                   ; AC = int_len_ms*1000. Self modifying code! See smf_init
+    ld hl, (var_us_per_int) : ld a, h : ld c, l          ;
     call div_ac_de                                       ; AC = int_len_ms*1000 / (tempo/ppqn), HL = remainder
     ld (var_smf_file.ticks_per_int+1), a                 ; save
     ld a, c                                              ; ...
@@ -514,16 +514,3 @@ smf_handle_meta:
 .exit:
     add hl, de                   ; next position += remaining data len
     ret                          ;
-
-
-smf_init:
-    ld a, (var_int_type)                  ; see smf_update_ticks_per_int for details
-    or a                                  ;
-    jr nz, .int_48_8_hz                   ;
-.int_50_0_hz:
-    ld hl, 1000*1000/50                   ;
-    jr 1f                                 ;
-.int_48_8_hz:
-    ld hl, 20492                          ; 1000*1000/48.8
-1:  ld (smf_update_ticks_per_int.A+1), hl ;
-    ret                                   ;

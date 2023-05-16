@@ -40,16 +40,17 @@ screen_select_menu:
     call print_string0                        ;
     LD_SCREEN_ADDRESS hl, LAYOUT_INFO_FREQ    ;
     ld a, (var_cpu_freq)                      ;
-    cp CPU_FREQ_3_5_MHZ  : jr nz, 1f : ld ix, str_3_5_mhz  : jr 2f ;
-1:  cp CPU_FREQ_3_54_MHZ : jr nz, 1f : ld ix, str_3_54_mhz : jr 2f ;
-1:  cp CPU_FREQ_7_MHZ    : jr nz, 1f : ld ix, str_7_mhz    : jr 2f ;
-1:  cp CPU_FREQ_14_MHZ   : jr nz, 1f : ld ix, str_14_mhz   : jr 2f ;
-1:  cp CPU_FREQ_28_MHZ   : jr nz, 3f : ld ix, str_28_mhz   : jr 2f ;
+    cp CPU_3_5_MHZ  : jr nz, 1f : ld ix, str_3_5_mhz  : jr 2f ;
+1:  cp CPU_3_54_MHZ : jr nz, 1f : ld ix, str_3_54_mhz : jr 2f ;
+1:  cp CPU_7_MHZ    : jr nz, 1f : ld ix, str_7_mhz    : jr 2f ;
+1:  cp CPU_14_MHZ   : jr nz, 1f : ld ix, str_14_mhz   : jr 2f ;
+1:  cp CPU_28_MHZ   : jr nz, 3f : ld ix, str_28_mhz   : jr 2f ;
 2:  call print_string0                        ;
 3:  inc hl                                    ;
     ld a, (var_int_type)                      ;
-    cp INT_50_HZ   : jr nz, 1f : ld ix, str_50_hz : jr 2f ;
-1:  cp INT_48_8_HZ : jr nz, 3f : ld ix, str_48_hz : jr 2f ;
+    cp INT_50_HZ : jr nz, 1f : ld ix, str_50_hz : jr 2f ;
+1:  cp INT_49_HZ : jr nz, 1f : ld ix, str_49_hz : jr 2f ;
+1:  cp INT_48_HZ : jr nz, 3f : ld ix, str_48_hz : jr 2f ;
 2:  call print_string0                        ;
 3:
 .menus:
