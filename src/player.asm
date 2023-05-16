@@ -41,20 +41,29 @@ player_loop:
 .loop:
     call vis_process_frame         ;
     call player_update_timer       ;
-    ld hl, var_player_state.flags  ; if in fast forward mode - skip halt
-    bit PLAYER_FLAG_FF, (hl)       ; ...
     ld hl, var_player_state.last_int_counter ;
-    jp nz, .ff_sub                 ; ...
+    ld a, (var_player_state.flags) ; if in fast forward mode - skip halt
+    bit PLAYER_FLAG_FF, a          ; ...
+    jp z, .no_ff                   ; ...
+.ff:
+    ld (var_input_no_beep), a      ;
+    res PLAYER_FLAG_FF, a          ;
+    ld (var_player_state.flags), a ;
+    call player_redraw_buttons     ;
+    ld a, (var_int_counter)        ;
+    ld (hl), a                     ;
+    jp .frame_start                ;
+.no_ff:
     xor a                          ;
     ld (var_input_no_beep), a      ;
     ld a, (var_int_counter)        ; if (last_int_counter != current_int_counter) - skip halt
     cp (hl)                        ; ...
-    jr nz, .frame_start            ; ...
+    jr nz, 1f                      ; ...
     xor a : out (#fe), a           ;
     halt                           ;
     inc a : out (#fe), a           ;
+1:  inc (hl)                       ; increment last_int_counter
 .frame_start:
-    inc (hl)                       ; increment last_int_counter
     call uart_flush_txbuf          ;
     call input_process             ;
     ld a, b                        ;
@@ -103,15 +112,6 @@ player_loop:
     jp nz, .process_current_track  ;
     call smf_next_int              ;
     jp .loop                       ;
-.ff_sub:
-    ld a, 1                        ;
-    ld (var_input_no_beep), a      ;
-    res PLAYER_FLAG_FF, (ix)       ;
-    call player_redraw_buttons     ;
-    ld a, (var_int_counter)        ;
-    dec a                          ;
-    ld (var_player_state.last_int_counter), a ;
-    jp .frame_start                ;
 .load_prev_file:
     ld a, 1                          ;
     ld (var_player_prevfile_flag), a ;
@@ -121,7 +121,8 @@ player_loop:
     ld (var_player_nextfile_flag), a ;
 .end:
     call uart_flush_txbuf            ;
-    ; jp player_reset_chip           ;
+    ; call player_reset_chip           ;
+    ; ret                              ;
 
 
 player_reset_chip:
