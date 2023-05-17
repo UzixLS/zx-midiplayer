@@ -32,6 +32,7 @@ ticks_per_int          WORD
 ticks_per_int_fraction WORD
 ticks                  DWORD
 ticks_fraction         WORD
+bytes_left             WORD
 tracks                 BLOCK SMF_MAX_TRACKS*smf_track_t
 _zerobyte              BYTE 0   ; this is read by smf_get_next_track and written by smf_parse (flags=0)
     ENDS
@@ -72,7 +73,6 @@ smf_parse_file_header_rmi:
     call file_get_next_byte : cp 'F' : ret nz  ;
     xor a                                      ; set Z flag
     ret                                        ;
-
 
 ; IN  - HL - position of beginning of file
 ; OUT -  F - Z = 1 on success, 0 on error
@@ -128,7 +128,12 @@ smf_parse_track_header:
     jr nc, 1f                                                  ; check if track is bigger than file
     or 1                                                       ; ... if yes - reset Z flag
     ret                                                        ; ... and exit
-1:  ld a, (1<<SMF_TRACK_FLAGS_VALID)|(1<<SMF_TRACK_FLAGS_PLAY) ; set track flags
+1:  push hl                                                    ; bytes_left += len
+    ld hl, (var_smf_file.bytes_left)                           ; ...
+    add hl, bc                                                 ; ...
+    ld (var_smf_file.bytes_left), hl                           ; ...
+    pop hl                                                     ; ...
+    ld a, (1<<SMF_TRACK_FLAGS_VALID)|(1<<SMF_TRACK_FLAGS_PLAY) ; set track flags
     ld (iy+smf_track_t.flags), a                               ; ...
     xor a                                                      ; set Z flag
     ld (iy+smf_track_t.last_status), a                         ;
@@ -159,6 +164,8 @@ smf_parse:
     ld (var_smf_file.ticks+3), a          ;
     ld (var_smf_file.ticks_fraction+0), a ;
     ld (var_smf_file.ticks_fraction+1), a ;
+    ld (var_smf_file.bytes_left+0), a     ;
+    ld (var_smf_file.bytes_left+1), a     ;
     ld a, (var_smf_file.num_tracks)       ; parse each track header
     ld ixl, a                             ; ...
     ld iy, var_smf_file.tracks            ; ...
@@ -174,6 +181,11 @@ smf_parse:
     xor a                                 ; set Z flag
     ret                                   ;
 
+
+; OUT - IX - bytes count to be played
+smf_get_bytes_left:
+    ld ix, (var_smf_file.bytes_left) ;
+    ret                              ;
 
 ; OUT - A - tracks
 smf_get_num_tracks:
@@ -212,14 +224,22 @@ smf_get_first_track:
 ; OUT - HL - current position of next track
 ; OUT - IY - pointer to next track
 ; OUT - AF - garbage
-; OUT - BC - garbage
+; OUT - DE - garbage
 smf_get_next_track:
-    ld (iy+smf_track_t.position+0), l ; IY->track_position = HL
+    ld e, (iy+smf_track_t.position+0) ; DE = old_position
+    ld d, (iy+smf_track_t.position+1) ; ...
+    ld (iy+smf_track_t.position+0), l ; IY->track_position = HL (current_position)
     ld (iy+smf_track_t.position+1), h ; ...
+    xor a                             ; bytes_left -= current_position - old_position
+    sbc hl, de                        ; ...
+    ex hl, de                         ; ...
+    ld hl, (var_smf_file.bytes_left)  ; ...
+    sbc hl, de                        ; ...
+    ld (var_smf_file.bytes_left), hl  ; ...
 .entry:
-    ld bc, smf_track_t                ;
+    ld de, smf_track_t                ;
 .next_track:
-    add iy, bc                        ; IY += sizeof(smf_track_t)
+    add iy, de                        ; IY += sizeof(smf_track_t)
     ld a, (iy+smf_track_t.flags)      ; if (!track_valid) return Z=1
     bit SMF_TRACK_FLAGS_VALID, a      ; ...
     ret z                             ; ...

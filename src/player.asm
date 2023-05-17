@@ -31,7 +31,7 @@ player_loop:
     call vis_init                  ;
     call file_get_current_file_name;
     call player_set_filename       ;
-    call file_get_current_file_size;
+    call smf_get_bytes_left        ;
     call player_set_size           ;
     call smf_get_num_tracks        ;
     call player_set_tracks         ;
@@ -256,18 +256,16 @@ player_set_filename:
     inc l                                                     ; ...
     jr .fill_tail_with_spaces                                 ; ...
 
-; IN  - BC - size value
-; OUT - AF - garbage
-; OUT - BC - garbage
-; OUT - DE - garbage
+; IN  - IX  - size value
+; OUT - AF  - garbage
+; OUT - BC  - garbage
+; OUT - DE  - garbage
 ; OUT - HL  - garbage
 player_set_size:
-    push bc                              ;
     LD_SCREEN_ADDRESS hl, LAYOUT_SIZE    ;
-    ld a, b                              ;
+    ld a, ixh                            ;
     call print_hex                       ;
-    pop bc                               ;
-    ld a, c                              ;
+    ld a, ixl                            ;
     call print_hex                       ;
     ret                                  ;
 
@@ -300,6 +298,9 @@ player_update_timer:
     ld (var_player_state.subseconds_h), a            ;
     call print_char                                  ; print subsecond = 0
 .next_second_l:
+    ; call smf_get_bytes_left                        ; update size every second
+    ld ix, (var_smf_file.bytes_left)                 ; ...
+    call player_set_size                             ; ...
     LD_SCREEN_ADDRESS hl, LAYOUT_TIMER+4             ;
     ld a, (var_player_state.seconds_l)               ;
     inc a                                            ;
