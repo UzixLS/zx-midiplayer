@@ -39,7 +39,6 @@ _zerobyte              BYTE 0   ; this is read by smf_get_next_track and written
     STRUCT smf_track_t
 flags             BYTE
 last_status       BYTE
-start             WORD
 end               WORD
 position          WORD
 next_tick         DWORD
@@ -121,8 +120,6 @@ smf_parse_track_header:
     call file_get_next_byte : cp 0 : ret nz                    ; chunk_header_t.len+1
     call file_get_next_byte : ld b, a                          ; chunk_header_t.len+2
     ld d, b : call file_get_next_byte : ld b, d : ld c, a      ; chunk_header_t.len+3
-    ld (iy+smf_track_t.start+0), l                             ; save position to begin of track data
-    ld (iy+smf_track_t.start+1), h                             ; ...
     ld (iy+smf_track_t.position+0), l                          ; save position to begin of track data
     ld (iy+smf_track_t.position+1), h                          ; ...
     add hl, bc                                                 ; save position to end of track data

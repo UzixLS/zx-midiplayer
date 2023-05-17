@@ -12,9 +12,9 @@
     org screens_base
     lua allpass
         sj.add_word(0)
-        sj.add_word(_c("menu_scr_sna"))
-        sj.add_word(_c("play_scr_sna"))
-        sj.add_word(_c("help_scr_sna"))
+        sj.add_word(_c("menu_scr_sna")) -- screen_menu_ptr
+        sj.add_word(_c("play_scr_sna")) -- screen_play_ptr
+        sj.add_word(_c("help_scr_sna")) -- screen_help_ptr
         sj.insert_label("menu_scr_sna", sj.current_address); incbin_rle("res/menu.scr")
         sj.insert_label("play_scr_sna", sj.current_address); incbin_rle("res/play.scr")
         sj.insert_label("help_scr_sna", sj.current_address); incbin_rle("res/help.scr")
@@ -87,9 +87,9 @@ boot_b_end:
     org 0
     lua allpass
         sj.add_word(_c("start_scr_trd"))
-        sj.add_word(_c("menu_scr_trd"))
-        sj.add_word(_c("play_scr_trd"))
-        sj.add_word(_c("help_scr_trd"))
+        sj.add_word(_c("menu_scr_trd")) -- screen_menu_ptr
+        sj.add_word(_c("play_scr_trd")) -- screen_play_ptr
+        sj.add_word(_c("help_scr_trd")) -- screen_help_ptr
         sj.insert_label("start_scr_trd", sj.current_address + _c("screens_base")); incbin_rle("res/start.scr")
         sj.insert_label("menu_scr_trd",  sj.current_address + _c("screens_base")); incbin_rle("res/menu.scr")
         sj.insert_label("play_scr_trd",  sj.current_address + _c("screens_base")); incbin_rle("res/play.scr")

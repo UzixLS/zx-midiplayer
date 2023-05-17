@@ -78,8 +78,8 @@ screen_select_player:
     LD_SCREEN_ADDRESS hl, LAYOUT_FILENAME     ;
     ld ix, str_unnamed                        ;
     call print_string0                        ;
-    LD_SCREEN_ADDRESS hl, LAYOUT_TIME_MINUTES ;
-    ld ix, str_zerotime                       ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_TIMER        ;
+    ld ix, str_zerotimer                      ;
     call print_string0                        ;
     ret                                       ;
 

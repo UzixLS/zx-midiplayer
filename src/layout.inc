@@ -8,9 +8,7 @@ LAYOUT_SIZE                    equ #0902
 LAYOUT_TRACKS                  equ #0B02
 LAYOUT_TEMPO                   equ #0D02
 LAYOUT_PPQN                    equ #0F02
-LAYOUT_TIME_MINUTES            equ #0518
-LAYOUT_TIME_SECONDS            equ #051b
-LAYOUT_TIME_SUBSECONDS         equ #051e
+LAYOUT_TIMER                   equ #0518
 LAYOUT_CURSOR_ATTR             equ #38
 LAYOUT_CURSOR_INACTIVE_ATTR    equ #46
 LAYOUT_MENU_BG_ATTR            equ #46

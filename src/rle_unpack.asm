@@ -2,6 +2,8 @@
 ; IN  - HL - source
 ; OUT - DE - pointer to next untouched byte at dest
 ; OUT - HL - pointer to next byte after unpacked block
+; OUT - AF - garbage
+; OUT - B  - garbage
 rle_unpack:
     ld b, 1                               ;
     ld a, (hl)                            ;
