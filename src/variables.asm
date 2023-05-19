@@ -33,7 +33,6 @@ var_current_menu DB 0
 var_current_menu_ptr WORD main_menu
 var_current_drive DB 0
 var_smf_file smf_file_t
-var_tmp32 BLOCK 32
 
 var_player_state player_state_t
 var_player_nextfile_flag BYTE 0

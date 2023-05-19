@@ -137,7 +137,7 @@ player_reset_chip:
     ld a, ixl                      ;
 .loop:
     di : call uart_putc : ei       ;
-    ld a, 123                      ; 121 = all controllers off (this message clears all the controller values for this channel, back to their default values)
+    ld a, 123                      ; 123 = All notes off (this message stops all the notes that are currently playing)
     di : call uart_putc : ei       ;
     xor a                          ; 0 = value
     di : call uart_putc : ei       ;
@@ -148,10 +148,10 @@ player_reset_chip:
     ret                            ;
 
 
-; IN  - BC - string len
+; IN  - DE - string len
 ; IN  - HL - file position
 ; OUT - AF - garbage
-; OUT - B  - garbage
+; OUT - BC - garbage
 ; OUT - DE - garbage
 ; OUT - HL - garbage
 ; OUT - IX - garbage
@@ -160,41 +160,45 @@ player_set_title:
     bit PLAYER_FLAG_TITLE_SET, (ix)          ; ...
     ret nz                                   ; ...
     set PLAYER_FLAG_TITLE_SET, (ix)          ; ...
-    ld ix, var_tmp32                         ;
-.check_len:
-    ex de, hl                                ; if (len > LAYOUT_TITLE_LEN) len = LAYOUT_TITLE_LEN
-    ld hl, LAYOUT_TITLE_LEN                  ; ...
-    xor a                                    ; ... reset C flag
-    sbc hl, bc                               ; ...
-    ex de, hl                                ; ...
-    ld b, c                                  ;
-    jr z, .loadstring                        ; ... if (len == LAYOUT_TITLE_LEN) goto .loadstring
-1:  jp nc, .loadstring                       ; ... if (len <  LAYOUT_TITLE_LEN) goto .loadstring
-    ld c, LAYOUT_TITLE_LEN                   ; ... if (len >  LAYOUT_TITLE_LEN)
-    ld (ix+LAYOUT_TITLE_LEN-1), udg_ellipsis ; ...
-    ld b, LAYOUT_TITLE_LEN-1                 ;
-.loadstring:
-    push bc                                  ;
+    xor a                                    ; if (len > 255 || len == 0) exit
+    or d                                     ; ...
+    ret nz                                   ; ...
+    or e                                     ; ...
+    ret z                                    ; ...
+    ld ixh, LAYOUT_TITLE_LEN                 ; IXH = maxlen
+    ld ixl, e                                ; IXL = len
+    LD_SCREEN_ADDRESS de, LAYOUT_TITLE       ;
+.printloop:
     call file_get_next_byte                  ; A = char
-    pop bc                                   ;
-    ld (ix), a                               ; *var_tmp32++ = A
-    inc ix                                   ; ...
-    djnz .loadstring                         ; repeat while (--len)
+    cp 32                                    ; if (char < 32 ' ' || char > 126 '~') - non printable
+    jr c, 1f                                 ; ...
+    cp 126+1                                 ; ...
+    jr c, 2f                                 ; ...
+1:  ld a, udg_nonprintable                   ; ...
+2:  ex de, hl                                ;
+    push de                                  ;
+    call print_char                          ;
+    pop de                                   ;
+    ex de, hl                                ;
+    dec ixh                                  ; maxlen--
+    jr z, .title_is_too_long                 ;
+    inc e                                    ; screen_position++
+    dec ixl                                  ; len--
+    jr nz, .printloop                        ;
+    ex de, hl                                ;
 .append_trailing_spaces:
-    ld a, LAYOUT_TITLE_LEN                   ; clear trailing characters
-    sub c                                    ; ...
-    jr z, .printstring                       ; ... check len == LAYOUT_TITLE_LEN
-    ld b, a                                  ; ...
-    ld a, ' '                                ; ...
-1:  ld (ix), a                               ; ...
-    inc ix                                   ; ...
-    djnz 1b                                  ; repeat while (--len)
-.printstring:
-    ld b, LAYOUT_TITLE_LEN                   ;
-    LD_SCREEN_ADDRESS hl, LAYOUT_TITLE       ;
-    ld ix, var_tmp32                         ;
-    call print_stringl                       ;
+    ld a, ' '                                ;
+    call print_char                          ;
+    inc l                                    ;
+    dec ixh                                  ; maxlen--
+    jr nz, .append_trailing_spaces           ;
     ret                                      ;
+.title_is_too_long:
+    dec ixl                                  ; if this was last char - just exit
+    ret z                                    ; ...
+    ex de, hl                                ; otherwise print elipsis at last position
+    ld a, udg_ellipsis                       ; ...
+    jp print_char                            ; ...
 
 
 ; IN  - A  - tracks value
@@ -220,8 +224,7 @@ player_set_ppqn:
     call print_hex                       ;
     pop bc                               ;
     ld a, c                              ;
-    call print_hex                       ;
-    ret                                  ;
+    jp print_hex                         ;
 
 ; IN - AIX - tempo value
 ; OUT - AF - garbage
@@ -232,10 +235,7 @@ player_set_tempo:
     LD_SCREEN_ADDRESS hl, LAYOUT_TEMPO   ;
     call print_hex                       ;
     ld a, ixh                            ;
-    call print_hex                       ;
-    ; ld a, ixl                          ; ignore lowest byte
-    ; call print_hex                     ;
-    ret                                  ;
+    jp print_hex                         ;
 
 ; IN  - IX - pointer to string
 ; OUT - AF - garbage
@@ -266,8 +266,7 @@ player_set_size:
     ld a, ixh                            ;
     call print_hex                       ;
     ld a, ixl                            ;
-    call print_hex                       ;
-    ret                                  ;
+    jp print_hex                         ;
 
 
 ; OUT - AF - garbage

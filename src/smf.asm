@@ -528,7 +528,6 @@ smf_handle_meta:
     dec de                       ; ...
     push de                      ;
     push hl                      ;
-    ld b, d : ld c, e            ; BC = data len
     call player_set_title        ;
     pop hl                       ;
     pop de                       ;

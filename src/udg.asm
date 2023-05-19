@@ -29,3 +29,13 @@ udg_ellipsis equ 130
     DG --------
     DG -#-#-#--
     DG --------
+
+udg_nonprintable equ 131
+    DG -######-
+    DG ###--###
+    DG ##-##-##
+    DG ###-####
+    DG ####-###
+    DG ########
+    DG ####-###
+    DG -######-
