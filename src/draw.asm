@@ -383,10 +383,10 @@ print_string0:
 ; IN  -  H - Y character position [0..23]
 ; IN  -  L - X character position [0..31]
 ; IN  -  B - string length
-; OUT -  A - 0
-; OUT - IX - pointer to NULL byte
+; OUT -  B - 0
+; OUT - IX - pointer to the byte after last printed char
 ; OUT - HL - screen address of last printed character
-; OUT -  F - garbage
+; OUT - AF - garbage
 ; OUT - DE - garbage
 print_stringl_at:
     call get_char_address ; HL = screen address

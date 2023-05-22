@@ -156,7 +156,7 @@ trdos_exec_fun:
 .restore_error_handler:
 .A  ld iy, 0                               ; self modifying code! see .setup_error_handler
     ld (trdos_var_err_sp), iy              ;
-.restore_basic_interceptor
+.restore_basic_interceptor:
     ld a, #c9                              ; "ret"
     ld (trdos_var_basic_interceptor+0), a  ; ...
 .restore_screen:
@@ -202,6 +202,11 @@ file_load_catalogue:
     xor a                                 ; Z=1
     ret                                   ;
 
+; OUT - AF - garbage
+; OUT -  B - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
+; OUT - IX - garbage
 file_catalogue_optimize:          ; reorganize catalogue to skip all deleted files
     ld b, trdos_max_files         ;
     ld de, trdos_file_header_size ;
@@ -231,6 +236,11 @@ file_catalogue_optimize:          ; reorganize catalogue to skip all deleted fil
     ld (ix), a                    ; ... boundary. So file_buffer should be at least trdos_max_files*trdos_file_header_size+1 bytes
     ret                           ;
 
+; OUT - AF - garbage
+; OUT -  B - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
+; OUT - IX - garbage
 file_catalogue_format_extensions:
     ld b, trdos_max_files         ;
     ld de, trdos_file_header_size ;
@@ -292,6 +302,10 @@ file_menu_generator_get_icon:
 ; IN  - DE - entry number
 ; OUT -  F - NZ when ok, Z when not ok
 ; OUT - IX - pointer to 0-terminated string
+; OUT -  A - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
 file_menu_generator:
     xor a                     ; if (entry_number >= 128) - return not ok
     or d                      ; ...
@@ -303,21 +317,18 @@ file_menu_generator:
     jp c, 1f                  ; ...
     xor a                     ; ... set Z flag
     ret                       ; ...
-1:  push de                   ;
-    sla e : rl d              ; entry_number = entry_number * 16
+1:  sla e : rl d              ; entry_number = entry_number * 16
     sla e : rl d              ; ...
     sla e : rl d              ; ...
     sla e : rl d              ; ...
     ld hl, file_buffer        ; HL = file_buffer + entry_number * 16
     add hl, de                ; ...
-    pop de                    ;
     ld a, (hl)                ; if first byte == 0x00 or 0xFF - return error (no entry)
     or a                      ; ...
     ret z                     ; ...
     inc a                     ; ...
     ret z                     ; ...
     ld ix, file_menu_string+2 ;
-    push bc                   ;
     ld b, 8                   ;
 .filenamecopy:                ;
     ld a, (hl)                ;
@@ -341,7 +352,6 @@ file_menu_generator:
     ld (ix), a                ;
     ld a, ' '                 ; space
     ld (ix+1), a              ;
-    pop bc                    ;
     or 1                      ; set NZ flag
     ret                       ;
 
@@ -368,12 +378,17 @@ file_get_current_file_size:
 
 ; IN  -  E - file number [0..127]
 ; OUT -  F - Z when ok, NZ when not ok
+; OUT -  A - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
+; OUT - IX - garbage
 file_load:
     xor a                                   ;
     ld (var_current_file_number+1), a       ;
     ld a, e                                 ;
     ld (var_current_file_number+0), a       ;
-.select_page
+.select_page:
     ld a, (file_pages)                      ; select first page for file
     ld bc, #7ffd                            ; ...
     out (c), a                              ; ...

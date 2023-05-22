@@ -85,50 +85,42 @@ exit:
 
 
 help:
+    ld hl, (var_current_screen)               ;
+    push hl                                   ;
     call screen_select_help                   ;
 .patch_int:
     ld a, (int_handler)                       ;
     push af                                   ;
     ld a, #c9                                 ; ret
     ld (int_handler), a                       ;
-.patch_for_machine                            ;
-    ld a, (var_lines_after_int_before_screen) ;
-    add 121-1                                 ; 121th line on image - 1 line of correction
-    ld (.A+1), a                              ;
-    ld a, (var_horizontal_align+0)            ;
-    ld (.B+1), a                              ;
-    ld a, (var_horizontal_align+1)            ;
-    ld (.B+2), a                              ;
-    ld a, (var_tstates_per_line+0) : ld l, a  ;
-    ld a, (var_tstates_per_line+1) : ld h, a  ;
-    push hl                                   ;
-    ld bc, -24                                ; number of tstates, see .border_lines_loop
+.patch_for_machine:                           ;
+    ld bc, (var_device.tstates_per_line)      ;
+    ld hl, -24                                ; number of tstates, see .border_lines_loop
     add hl, bc                                ;
-    ld a, l : ld (.C+1), a                    ;
-    ld a, h : ld (.C+2), a                    ;
-    pop hl                                    ;
-    ld bc, -64                                ; number of tstates, see .border_lines_loop
+    ld (.A+1), hl                             ;
+    ld hl, -64                                ; number of tstates, see .border_lines_loop
     add hl, bc                                ;
-    ld a, l : ld (.D+1), a                    ;
-    ld a, h : ld (.D+2), a                    ;
+    ld (.B+1), hl                             ;
 .loop:                                        ;
-    ld e, 5                                   ;
-.A  ld d, 0                                   ; self modifying code! See above
-.B  ld hl, 0                                  ; self modifying code! See above
+    ld a, (var_device.lines_before_screen)    ;
+    add 121-1                                 ; 121th line on image - 1 line of correction
+    ld d, a                                   ;
+    ld e, 5                                   ; 5 lines on border
+    ld hl, (var_device.horizontal_align)      ;
     ei : halt                                 ;
     call delay_tstate         ; (hl)          ; delay to align to next line beginning
 .border_lines_loop:
-.C  ld hl, 0                  ; (10)          ; 24 + HL T-states * D. Self modifying code! See above
+.A  ld hl, 0                  ; (10)          ; 24 + HL T-states * D. Self modifying code! See above
     call delay_tstate         ; (hl)          ; ...
     dec d                     ; (4)           ; ...
     jp nz, .border_lines_loop ; (10)          ; ...
     ld a, LAYOUT_HELP_BORDER  ; (7)           ; 64 + HL T-states
     out (#fe), a              ; (11)          ; ...
-.D  ld hl, 0                  ; (10)          ; ... self modifying code! See above
+.B  ld hl, 0                  ; (10)          ; ... self modifying code! See above
     call delay_tstate         ; (hl)          ; ...
     xor a                     ; (4)           ; ...
     dec e                     ; (4)           ; ...
-    ld d, 7                   ; (7)           ; ...
+    ld d, 7                   ; (7)           ; ... 7 empty lines
     out (#fe), a              ; (11)          ; ...
     jp nz, .border_lines_loop ; (10)          ; ...
 .process:
@@ -140,7 +132,9 @@ help:
     pop af                                    ;
     ld (int_handler), a                       ;
     ei                                        ;
-.exit
+.exit:
+    pop hl                                    ;
+    ld (var_current_screen), hl               ;
     jp screen_redraw                          ;
 
 
@@ -251,6 +245,9 @@ main_menu_callback:
 ; IN  - DE - entry number
 ; OUT -  F - NZ when ok, Z when not ok
 ; OUT - IX - pointer to 0-terminated string
+; OUT -  A - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
 main_menu_generator:
     ld hl, .entries_count-1 ; exit if DE >= entries_count
     xor a                   ; ...
@@ -258,14 +255,12 @@ main_menu_generator:
     jp nc, 1f               ; ...
     xor a                   ; ... Z=1
     ret                     ; ...
-1:  push de                 ;
-    ld ix, .entries         ;
+1:  ld ix, .entries         ;
     sla e : rl d            ;
     add ix, de              ;
     ld e, (ix+0)            ;
     ld d, (ix+1)            ;
     ld ixl, e : ld ixh, d   ;
-    pop de                  ;
     or 1                    ; Z=0
     ret                     ;
 .entries:
