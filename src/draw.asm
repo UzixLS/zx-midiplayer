@@ -418,32 +418,27 @@ print_hex_2     ld a, (ix) : inc ix
 ; OUT - BC - garbage
 ; OUT - DE - garbage
 print_hex:
-    push af             ; store the value
-    and 0xf0            ; get the top nibble
+    push af             ;
     rra                 ; shift into bottom nibble
-    rra
-    rra
-    rra
-    cp 10               ; if a >= 10 - handle as HEX
-    jp c, 1f            ; ...
-    add a, 'A'-10       ; add to ASCII 'A'
-    call print_char     ; print the character
-    jp 2f
-1:  add a, '0'          ; add to ASCII '0'
-    call print_char     ; print the character
-2:  inc l               ; move right one space
-    pop af
-    and 0x0f            ; get the bottom nibble
-    cp 10               ; if a >= 10 - handle as HEX
-    jp c, 1f            ; ...
-    add a, 'A'-10       ; add to ASCII 'A'
-    call print_char     ; print the character
+    rra                 ;
+    rra                 ;
+    rra                 ;
+    and #0f             ;
+    add a, #90          ;
+    daa                 ;
+    adc a, #40          ;
+    daa                 ;
+    call print_char     ;
     inc l               ; move right one space
-    ret
-1:  add a, '0'          ; add to ASCII '0'
-    call print_char     ; print
+    pop af              ;
+    and #0f             ;
+    add a, #90          ;
+    daa                 ;
+    adc a, #40          ;
+    daa                 ;
+    call print_char     ;
     inc l               ; move right one space
-    ret
+    ret                 ;
 
 
 ; Print a single character out to an X/Y position
