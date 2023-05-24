@@ -45,7 +45,7 @@ screen_select_menu:
     ld ix, str_head                           ;
     call print_string0                        ;
     LD_SCREEN_ADDRESS hl, LAYOUT_INFO_VERSION ;
-    ld ix, buildversion                       ;
+    ld ix, str_version                        ;
     call print_string0                        ;
     LD_SCREEN_ADDRESS hl, LAYOUT_INFO_FREQ    ;
     ld a, (var_device.cpu_freq)               ;
@@ -55,7 +55,7 @@ screen_select_menu:
 1:  cp CPU_14_MHZ   : jr nz, 1f : ld ix, str_14_mhz   : jr 2f ;
 1:  cp CPU_28_MHZ   : jr nz, 3f : ld ix, str_28_mhz   : jr 2f ;
 2:  call print_string0                        ;
-3:  inc hl                                    ;
+3:  LD_SCREEN_ADDRESS hl, LAYOUT_INFO_INT     ;
     ld a, (var_device.int_type)               ;
     cp INT_50_HZ : jr nz, 1f : ld ix, str_50_hz : jr 2f ;
 1:  cp INT_49_HZ : jr nz, 1f : ld ix, str_49_hz : jr 2f ;

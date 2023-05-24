@@ -16,12 +16,12 @@ LAYOUT_MENU_BG_INACTIVE_ATTR   equ #01
 LAYOUT_MENU_HIDDEN_ATTR        equ #00
 LAYOUT_MAINMENU_X              equ 1
 LAYOUT_MAINMENU_Y              equ 2
-LAYOUT_MAINMENU_LINES          equ 15
-LAYOUT_MAINMENU_COLUMNS        equ 14
-LAYOUT_FILEMENU_X              equ 17
+LAYOUT_MAINMENU_LINES          equ 14
+LAYOUT_MAINMENU_COLUMNS        equ 8
+LAYOUT_FILEMENU_X              equ 11
 LAYOUT_FILEMENU_Y              equ 2
 LAYOUT_FILEMENU_LINES          equ 20
-LAYOUT_FILEMENU_COLUMNS        equ 14
+LAYOUT_FILEMENU_COLUMNS        equ 20
 LAYOUT_BARS_X                  equ 64
 LAYOUT_BARS_Y                  equ 64
 LAYOUT_BARS_N                  equ 16
@@ -39,8 +39,8 @@ LAYOUT_PIANO_KEYS_BLACK_ON     equ %01110111
 LAYOUT_PIANO_KEYS_BLACK_OFF    equ %00000111
 LAYOUT_PIANO_KEYS_ON_LINES     equ 3
 LAYOUT_INFO_VERSION            equ #1601
-LAYOUT_INFO_FREQ               equ #1401
-LAYOUT_INFO_INT                equ #140a
+LAYOUT_INFO_FREQ               equ #1201
+LAYOUT_INFO_INT                equ #1401
 LAYOUT_HEAD                    equ #0000
 LAYOUT_LOGO                    equ #081b
 LAYOUT_LOGO_LINES              equ 8

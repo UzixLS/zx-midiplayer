@@ -25,3 +25,4 @@ str_exit:        DEFSTR "Exit"
 str_untitled:    DEFSTR "Untitled MIDI melody"
 str_unnamed:     DEFSTR "untitled.mid"
 str_zerotimer:   DEFSTR "00:00.0"
+str_version:     DEFSTR VERSIONSHORT_DEF

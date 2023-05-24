@@ -300,11 +300,7 @@ main_menu: menu_t main_menu_generator 0 main_menu_callback LAYOUT_MAINMENU_Y LAY
 
 
 buildversion:
-    ifdef VERSION_DEF
     db VERSION_DEF, 0
-    else
-    db 0
-    endif
 builddate:
     db __DATE__, " ", __TIME__, 0
     db "Code end",0
