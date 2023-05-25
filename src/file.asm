@@ -8,8 +8,11 @@
 ; 6 110             slow
 ; 7 111 altscr slow slow
 
-file_pages:
-    db #10, #14, #16, #13
+file_page0 equ #10
+file_page1 equ #14
+file_page2 equ #16
+file_page3 equ #13
+file_pages: db file_page0, file_page1, file_page2, file_page3
 
 file_base_addr equ #c000
 file_page_size equ #4000
@@ -21,26 +24,30 @@ file_page_size equ #4000
 ; OUT -  F - garbage
 ; OUT - BC - garbage
 file_get_next_byte:
-    ld a, h                                                          ; compare requested page with current page
-    and #c0                                                          ; ...
-.pg:cp #0f                                                           ; ... self modifying code! see bellow and file_load
-    jp z, .get                                                       ; ...
+    ld a, h                          ; compare requested page with current page
+    and #c0                          ; ...
+.pg:cp #0f                           ; ... self modifying code! see bellow and file_load
+    jp z, .get                       ; ...
 .switch_page:
-    ld (.pg+1), a                                                    ;
-    ld bc, #7ffd                                                     ;
-    or a   : jp nz, 1f : ld a, (file_pages+0) : out (c), a : jp .get ;
-1:  cp #40 : jp nz, 1f : ld a, (file_pages+1) : out (c), a : jp .get ;
-1:  cp #80 : jp nz, 1f : ld a, (file_pages+2) : out (c), a : jp .get ;
-1:                       ld a, (file_pages+3) : out (c), a : jp .get ;
+    ld (.pg+1), a                    ;
+    .4 rrca                          ; A = 0/4/8/12
+    ld (.A+1), a                     ;
+.A  jr $                             ;
+    ld a, file_page0 : jr 1f         ; 2 bytes + 2 bytes
+    ld a, file_page1 : jr 1f         ;
+    ld a, file_page2 : jr 1f         ;
+    ld a, file_page3                 ;
+1:  ld bc, #7ffd                     ;
+    out (c), a                       ;
 .get:
-    ld a, h                                                          ; position = position[5:0]
-    and #3f                                                          ; ...
-    add high file_base_addr                                          ; A = *(base_addr + position)
-    ld b, a                                                          ; ...
-    ld c, l                                                          ; ...
-    ld a, (bc)                                                       ; ...
-    inc hl                                                           ; position++
-    ret                                                              ;
+    ld a, h                          ; position = position[5:0]
+    and #3f                          ; ...
+    add high file_base_addr          ; A = *(base_addr + position)
+    ld b, a                          ; ...
+    ld c, l                          ; ...
+    ld a, (bc)                       ; ...
+    inc hl                           ; position++
+    ret                              ;
 
 
 

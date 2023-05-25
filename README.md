@@ -24,4 +24,5 @@ You may use addon with builtin MIDI synthesizer or connect an external one to yo
 - Handle last entry in playlist
 - Implement FAT32 support
 - Implement DivMMC, ZXMMC and Z-Controller support
+- Support for >64Kb files
 - Correctly handle TRDOS-less environment
