@@ -1,6 +1,7 @@
 /.tmp
 /.vscode
 /build
+/res/midi_staging/
 ~*
 *~
 *~.*
