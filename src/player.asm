@@ -63,9 +63,9 @@ player_loop:
     ld a, (var_int_counter)        ; if (last_int_counter != current_int_counter) - skip halt
     cp (hl)                        ; ...
     jr nz, 1f                      ; ...
-    xor a : out (#fe), a           ;
+    ; xor a : out (#fe), a           ;
     halt                           ;
-    inc a : out (#fe), a           ;
+    ; inc a : out (#fe), a           ;
 1:  inc (hl)                       ; increment last_int_counter
 .frame_start:
     call uart_flush_txbuf          ;
