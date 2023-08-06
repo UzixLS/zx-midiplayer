@@ -12,11 +12,14 @@ var_input_key_last BYTE INPUT_KEY_NONE
 var_input_key_hold_timer BYTE 0
 var_input_no_beep BYTE 0
 
+var_boot_drive DB 0
+var_current_drive DB 0
+var_trdos_present DB 0
+
 var_basic_iy WORD 0
 var_int_counter BYTE 0
 var_current_menu DB 0
 var_current_menu_ptr WORD main_menu
-var_current_drive DB 0
 var_smf_file smf_file_t
 
 var_player_state player_state_t

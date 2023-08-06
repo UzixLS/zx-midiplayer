@@ -57,6 +57,7 @@ main:
     call device_detect_cpu_int      ;
     call uart_init                  ;
     call input_detect_kempston      ;
+    call file_init                  ;
     ld iy, main_menu                ;
     call menu_init                  ;
     ld iy, file_menu                ;
@@ -227,15 +228,19 @@ main_menu_callback:
     ld (var_current_drive), a   ;
     call file_load_catalogue    ;
     ld iy, file_menu            ;
+    jr z, 1f                    ;
+    ld a, LAYOYT_ERR_FE         ;
+    out (#fe), a                ;
     call menu_init              ;
     call menu_draw              ;
-    call menu_main_file_toggle  ;
-    ret
+    jp menu_style_inactive      ;
+1:  call menu_init              ;
+    call menu_draw              ;
+    jp menu_main_file_toggle    ;
 .help:
     cp 4                        ;
     jr nz, .exit                ;
-    call help                   ;
-    ret                         ;
+    jp help                     ;
 .exit:
     cp 5                        ;
     jr nz, .unhandled_menu_item ;
@@ -320,4 +325,5 @@ stack_top:
     export end
     export main
     export stack_top
+    export var_trdos_present
     savebin "main.bin", begin, end-begin

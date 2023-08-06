@@ -66,6 +66,8 @@ boot_b:
     ld hl, #c000                          ; ... and unpack
     ld de, begin                          ; ...
     call rle_unpack                       ; ...
+    ld a, 1                               ;
+    ld (var_trdos_present), a             ;
     jp main                               ;
 
 ; IN - HL - destination address

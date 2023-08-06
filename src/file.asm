@@ -55,6 +55,7 @@ trdos_var_next_sector        equ #5cf4
 trdos_var_next_track         equ #5cf5
 trdos_var_basic_interceptor  equ #5cc2
 trdos_var_err_sp             equ #5c3d
+trdos_var_current_drive      equ #5d19
 
 trdos_entrypoint_commandline equ #3d00
 trdos_entrypoint_basic_cmd   equ #3d03
@@ -184,8 +185,6 @@ trdos_exec_fun:
 file_load_catalogue:
     xor a                                 ; set zero byte to first file name - same as clearing file list
     ld (file_buffer), a                   ; ...
-    di                                    ;
-    call trdos_entrypoint_init            ;
     ld c, trdos_fun_select_drive          ; select drive A/B/C/D
     ld a, (var_current_drive)             ; ...
     call trdos_exec_fun                   ; ...
@@ -488,3 +487,17 @@ file_load:
     ld (file_get_next_byte.pg+1), a         ; ...
     xor a                                   ; Z=1
     ret                                     ;
+
+
+file_init:
+    ld a, (trdos_var_current_drive) ;
+    ld (var_boot_drive), a          ;
+    ld (var_current_drive), a       ;
+    ld a, (var_trdos_present)       ; if there is no trdos - stub trdos_exec_fun()
+    or a                            ;
+    ret nz                          ;
+    ld hl, trdos_exec_fun           ; ...
+    ld (hl), #f6 : inc hl           ; ... or 1
+    ld (hl), #01 : inc hl           ; ...
+    ld (hl), #c9                    ; ... ret
+    ret                             ;
