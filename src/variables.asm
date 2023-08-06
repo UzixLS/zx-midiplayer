@@ -33,3 +33,6 @@ var_current_file_size WORD 0
 var_current_screen WORD 0
 var_trdos_error DB 0
 var_trdos_cleared_screen DB 0
+
+var_settings settings_t
+var_settings_sector WORD 0

@@ -2,6 +2,7 @@
 generator_fun   WORD ; IN - DE - entry number ; OUT -  F - NZ when ok, Z when not ok ; OUT - IX - pointer to 0-terminated string
 count_fun       WORD ; OUT - DE - total entries count
 callback_fun    WORD ; IN - DE - entry number
+context         WORD
 y_top           BYTE
 x_left          BYTE
 lines           BYTE
@@ -355,6 +356,12 @@ menu_call_generator:
     ld l, (iy+menu_t.generator_fun+0)
     ld h, (iy+menu_t.generator_fun+1)
     jp (hl)
+
+
+menu_dummy_generator:
+    xor a                                 ; set Z flag
+menu_dummy_callback:
+    ret                                   ;
 
 
 ; menu_debug_loop:

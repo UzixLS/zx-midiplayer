@@ -44,6 +44,23 @@ int_im2_vector_table:
                 ; but by other references and by T80/A-Z80 implementation int vector is I * 256 + D
                 ; so we just play safe and use symmetric int handler address and vector table with one extra byte
 
+    include "rle_unpack.asm"
+    include "delay_tstate.asm"
+    include "input.asm"
+    include "menu.asm"
+    include "menugen.asm"
+    include "file.asm"
+    include "uart.asm"
+    include "math.asm"
+    include "smf.asm"
+    include "player.asm"
+    include "draw.asm"
+    include "device.asm"
+    include "screen.asm"
+    include "vis.asm"
+    include "settings.asm"
+
+
 main:
     di                              ;
     ld sp, stack_top                ;
@@ -58,9 +75,10 @@ main:
     call uart_init                  ;
     call input_detect_kempston      ;
     call file_init                  ;
+    call settings_load              ;
     ld iy, main_menu                ;
     call menu_init                  ;
-    ld iy, file_menu                ;
+    ld iy, right_menu               ;
     call menu_init                  ;
     call screen_select_menu         ;
     call play_file                  ; file may be already loaded in ram
@@ -71,7 +89,7 @@ main:
     call input_process              ;
     ld a, (var_input_key)           ;
     cp INPUT_KEY_BACK               ;
-    call z, menu_main_file_toggle   ;
+    call z, menu_main_right_toggle  ;
     ld iy, (var_current_menu_ptr)   ;
     call menu_handle_input          ;
     jp .loop                        ;
@@ -141,25 +159,25 @@ help:
     jp screen_redraw                          ;
 
 
-menu_main_file_toggle:
+menu_main_right_toggle:
     ld a, (var_current_menu)      ;
     xor 1                         ;
     ld (var_current_menu), a      ;
 
-menu_main_file_set_style:
+menu_main_right_set_style:
     ld a, (var_current_menu)      ;
     or a                          ;
-    jp nz, .select_file_menu      ;
+    jp nz, .select_right_menu     ;
 .select_main_menu:
-    ld iy, file_menu              ;
+    ld iy, right_menu             ;
     call menu_style_inactive      ;
     ld iy, main_menu              ;
     ld (var_current_menu_ptr), iy ;
     jp menu_style_active          ;
-.select_file_menu:
+.select_right_menu:
     ld iy, main_menu              ;
     call menu_style_inactive      ;
-    ld iy, file_menu              ;
+    ld iy, right_menu             ;
     ld (var_current_menu_ptr), iy ;
     jp menu_style_active          ;
 
@@ -218,93 +236,72 @@ file_menu_callback:
     out (#fe), a        ;
     ret                 ;
 
+; IN - E - drive number
+main_menu_drive_select:
+    ld a, e                                                    ;
+    ld (var_current_drive), a                                  ;
+    call file_load_catalogue                                   ;
+    push af                                                    ;
+    ld iy, right_menu                                          ;
+    ld (iy+menu_t.generator_fun+0), low  file_menu_generator   ;
+    ld (iy+menu_t.generator_fun+1), high file_menu_generator   ;
+    ld (iy+menu_t.callback_fun+0),  low  file_menu_callback    ;
+    ld (iy+menu_t.callback_fun+1),  high file_menu_callback    ;
+    call menu_init                                             ;
+    call menu_draw                                             ;
+    pop af                                                     ;
+    jp z, menu_main_right_toggle                               ;
+    ld a, LAYOYT_ERR_FE                                        ;
+    out (#fe), a                                               ;
+    jp menu_style_inactive                                     ;
 
-; IN  - DE - entry number
-main_menu_callback:
-    ld a, e                     ;
-.bdi_drive:
-    cp 3+1                      ;
-    jr nc, .help                ;
-    ld (var_current_drive), a   ;
-    call file_load_catalogue    ;
-    ld iy, file_menu            ;
-    jr z, 1f                    ;
-    ld a, LAYOYT_ERR_FE         ;
-    out (#fe), a                ;
-    call menu_init              ;
-    call menu_draw              ;
-    jp menu_style_inactive      ;
-1:  call menu_init              ;
-    call menu_draw              ;
-    jp menu_main_file_toggle    ;
-.help:
-    cp 4                        ;
-    jr nz, .exit                ;
-    jp help                     ;
-.exit:
-    cp 5                        ;
-    jr nz, .unhandled_menu_item ;
-    jp exit                     ;
-.unhandled_menu_item:
-    ret                         ;
+main_menu_settings:
+    ld iy, right_menu                                          ;
+    ld (iy+menu_t.generator_fun+0), low  menugen_generator     ;
+    ld (iy+menu_t.generator_fun+1), high menugen_generator     ;
+    ld (iy+menu_t.callback_fun+0),  low  menugen_callback      ;
+    ld (iy+menu_t.callback_fun+1),  high menugen_callback      ;
+    ld (iy+menu_t.context+0),       low  settings_menu_entries  ;
+    ld (iy+menu_t.context+1),       high settings_menu_entries ;
+    call menu_init                                             ;
+    call menu_draw                                             ;
+    jp menu_main_right_toggle                                  ;
 
+main_menu_entries:
+    menugen_t 7
+    menugen_entry_t str_drive_a  0 main_menu_drive_select 0
+    menugen_entry_t str_drive_b  0 main_menu_drive_select 1
+    menugen_entry_t str_drive_c  0 main_menu_drive_select 2
+    menugen_entry_t str_drive_d  0 main_menu_drive_select 3
+    menugen_entry_t str_settings 0 main_menu_settings
+    menugen_entry_t str_help     0 help
+    menugen_entry_t str_exit     0 exit
 
-; IN  - DE - entry number
-; OUT -  F - NZ when ok, Z when not ok
-; OUT - IX - pointer to 0-terminated string
-; OUT -  A - garbage
-; OUT - DE - garbage
-; OUT - HL - garbage
-main_menu_generator:
-    ld hl, .entries_count-1 ; exit if DE >= entries_count
-    xor a                   ; ...
-    sbc hl, de              ; ...
-    jp nc, 1f               ; ...
-    xor a                   ; ... Z=1
-    ret                     ; ...
-1:  ld ix, .entries         ;
-    sla e : rl d            ;
-    add ix, de              ;
-    ld e, (ix+0)            ;
-    ld d, (ix+1)            ;
-    ld ixl, e : ld ixh, d   ;
-    or 1                    ; Z=0
-    ret                     ;
-.entries:
-    DW str_drive_a
-    DW str_drive_b
-    DW str_drive_c
-    DW str_drive_d
-    ; DW str_divmmc
-    ; DW str_zxmmc
-    ; DW str_zcontroller
-    DW str_help
-    DW str_exit
-.entries_count = ($-.entries)/2
+main_menu: menu_t {
+    menugen_generator
+    menugen_count
+    menugen_callback
+    main_menu_entries
+    LAYOUT_MAINMENU_Y
+    LAYOUT_MAINMENU_X
+    LAYOUT_MAINMENU_LINES
+    LAYOUT_MAINMENU_COLUMNS
+}
+right_menu: menu_t {
+    menu_dummy_generator
+    0
+    menu_dummy_callback
+    0
+    LAYOUT_RIGHTMENU_Y
+    LAYOUT_RIGHTMENU_X
+    LAYOUT_RIGHTMENU_LINES
+    LAYOUT_RIGHTMENU_COLUMNS
+}
 
-
-    include "rle_unpack.asm"
-    include "delay_tstate.asm"
-    include "input.asm"
-    include "menu.asm"
-    include "file.asm"
-    include "uart.asm"
-    include "math.asm"
-    include "smf.asm"
-    include "player.asm"
-    include "draw.asm"
-    include "device.asm"
-    include "screen.asm"
-    include "vis.asm"
 
     include "udg.asm"
     include "strings.asm"
-
     include "variables.asm"
-
-file_menu: menu_t file_menu_generator 0 file_menu_callback LAYOUT_FILEMENU_Y LAYOUT_FILEMENU_X LAYOUT_FILEMENU_LINES LAYOUT_FILEMENU_COLUMNS
-main_menu: menu_t main_menu_generator 0 main_menu_callback LAYOUT_MAINMENU_Y LAYOUT_MAINMENU_X LAYOUT_MAINMENU_LINES LAYOUT_MAINMENU_COLUMNS
-
 
 buildversion:
     db VERSION_DEF, 0
@@ -315,7 +312,7 @@ end:
     display "Code entrypoint=", main, " start=", begin, " end=",end, " len=", /d, end-begin
 
     assert $ < stack_bottom
-    org #BF00
+    org #BE00
 stack_bottom:
     org #BFFF
 stack_top:
@@ -326,4 +323,6 @@ stack_top:
     export main
     export stack_top
     export var_trdos_present
+    export var_settings_sector
+    export settings_magic
     savebin "main.bin", begin, end-begin

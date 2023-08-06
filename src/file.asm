@@ -329,7 +329,7 @@ file_menu_generator:
     ret z                     ; ...
     inc a                     ; ...
     ret z                     ; ...
-    ld ix, file_menu_string+2 ;
+    ld ix, tmp_menu_string+2  ;
     ld b, 8                   ;
 .filenamecopy:                ;
     ld a, (hl)                ;
@@ -388,7 +388,7 @@ file_menu_generator:
     ld (ix+6), a              ; ...
 .icon:
     call file_menu_generator_get_icon ; A = icon
-    ld ix, file_menu_string   ;
+    ld ix, tmp_menu_string    ;
     ld (ix), a                ;
     ld a, ' '                 ; space
     ld (ix+1), a              ;

@@ -378,27 +378,28 @@ print_string0:
     jr .loop              ; loop back to print next character
     ret                   ;
 
-; Print string
+
+; Print NULL(0)-terminated string from right to left
 ; IN  - IX - pointer to string
 ; IN  -  H - Y character position [0..23]
 ; IN  -  L - X character position [0..31]
-; IN  -  B - string length
-; OUT -  B - 0
-; OUT - IX - pointer to the byte after last printed char
+; OUT -  A - 0
+; OUT - IX - pointer to NULL byte
 ; OUT - HL - screen address of last printed character
-; OUT - AF - garbage
+; OUT -  F - garbage
+; OUT - BC - garbage
 ; OUT - DE - garbage
-print_stringl_at:
+print_string0_rev_at:
     call get_char_address ; HL = screen address
-print_stringl:
+print_string0_rev:
 .loop:
     ld a, (ix)            ; fetch the character to print
-    push bc               ;
+    or a                  ; exit if NULL character detected
+    ret z                 ; ...
     call print_char       ;
-    pop bc                ;
-    inc l                 ; go to the next screen address
-    inc ix                ; increase IX to the next character
-    djnz .loop            ; loop back to print next character
+    dec l                 ; go to the next screen address
+    dec ix                ; increase IX to the next character
+    jr .loop              ; loop back to print next character
     ret                   ;
 
 

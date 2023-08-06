@@ -66,6 +66,8 @@ boot_b:
     ld hl, #c000                          ; ... and unpack
     ld de, begin                          ; ...
     call rle_unpack                       ; ...
+    ld hl, (#5cf4)                        ; next sector is settings, save for further usage
+    ld (var_settings_sector), hl          ; ...
     ld a, 1                               ;
     ld (var_trdos_present), a             ;
     jp main                               ;
@@ -107,6 +109,11 @@ boot_b_end:
         sj.insert_label("code_sectors", math.ceil(sj.current_address/256))
     endlua
     assert $ < #4000
+    savetrd "main.trd", &"boot.B", 0, $
+
+    org 0
+    dd settings_magic
+    block 256-$, 0
     savetrd "main.trd", &"boot.B", 0, $
 
     lua allpass

@@ -65,9 +65,9 @@ screen_select_menu:
 .menus:
     ld iy, main_menu                          ;
     call menu_draw                            ;
-    ld iy, file_menu                          ;
+    ld iy, right_menu                         ;
     call menu_draw                            ;
-    call menu_main_file_set_style             ;
+    call menu_main_right_set_style            ;
     ret                                       ;
 
 

@@ -1,4 +1,5 @@
 LAYOYT_ERR_FE                  equ #02
+LAYOYT_OK_FE                   equ #04
 LAYOUT_DEBUG                   equ #0201
 LAYOUT_TITLE                   equ #0301
 LAYOUT_TITLE_LEN               equ 30
@@ -18,10 +19,10 @@ LAYOUT_MAINMENU_X              equ 1
 LAYOUT_MAINMENU_Y              equ 2
 LAYOUT_MAINMENU_LINES          equ 14
 LAYOUT_MAINMENU_COLUMNS        equ 8
-LAYOUT_FILEMENU_X              equ 11
-LAYOUT_FILEMENU_Y              equ 2
-LAYOUT_FILEMENU_LINES          equ 20
-LAYOUT_FILEMENU_COLUMNS        equ 20
+LAYOUT_RIGHTMENU_X             equ 11
+LAYOUT_RIGHTMENU_Y             equ 2
+LAYOUT_RIGHTMENU_LINES         equ 20
+LAYOUT_RIGHTMENU_COLUMNS       equ 20
 LAYOUT_BARS_X                  equ 64
 LAYOUT_BARS_Y                  equ 64
 LAYOUT_BARS_N                  equ 16
