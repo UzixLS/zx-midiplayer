@@ -3,29 +3,19 @@
     SLDOPT COMMENT WPMEM, LOGPOINT, ASSERTION
     DEVICE ZXSPECTRUM128,stack_top
 
-    includelua "lua/screen_address.lua"
+    include "lua/screen_address.inc"
     include "config.inc"
     include "layout.inc"
 
-    MACRO LD_SCREEN_ADDRESS _reg, _yyxx
-        lua allpass
-            _pc("ld _reg, " .. screen_address_pixel((_c("_yyxx")&0xff)*8, (_c("_yyxx")>>8)*8))
-        endlua
-    ENDM
-    MACRO LD_ATTR_ADDRESS _reg, _yyxx
-        lua allpass
-            _pc("ld _reg, " .. screen_address_attr((_c("_yyxx")&0xff)*8, (_c("_yyxx")>>8)*8))
-        endlua
-    ENDM
-
     page 0
-    org int_handler-(variables0_end-begin)
-    assert $ >= #6000
+    org int_handler-(variables_low_end-begin)
+    assert $ >= 0x6000
 begin:
     db "Code begin",0
     include "variables_low.asm"
-variables0_end:
+variables_low_end:
 
+    assert $ == 0x7f7f
     org #7f7f
 int_handler:
     push af                   ;
@@ -39,26 +29,28 @@ int_handler:
     assert $ < 0x8000
     org #8000
 int_im2_vector_table:
-    assert int_handler == 0x7f7f
-    .257 db #7f ; by Z80 user manual int vector is I * 256 + (D & 0xFE)
-                ; but by other references and by T80/A-Z80 implementation int vector is I * 256 + D
-                ; so we just play safe and use symmetric int handler address and vector table with one extra byte
+    ; by Z80 user manual int vector is I * 256 + (D & 0xFE)
+    ; but by other references and by T80/A-Z80 implementation int vector is I * 256 + D
+    ; so we just play safe and use symmetric int handler address and vector table with one extra byte
+    assert low int_handler == high int_handler
+    .257 db low int_handler
 
     include "rle_unpack.asm"
     include "delay_tstate.asm"
+    include "math.asm"
+    include "draw.asm"
     include "input.asm"
     include "menu.asm"
     include "menugen.asm"
+    include "device.asm"
     include "file.asm"
+    include "settings.asm"
     include "uart.asm"
-    include "math.asm"
+    include "shama2695.asm"
     include "smf.asm"
     include "player.asm"
-    include "draw.asm"
-    include "device.asm"
     include "screen.asm"
     include "vis.asm"
-    include "settings.asm"
 
 
 main:
