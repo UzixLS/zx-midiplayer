@@ -50,6 +50,12 @@ uart_init:
     ret                              ;
 
 
+uart_prepare:
+    xor a                             ;
+    ld (uart_txbuf_len), a            ;
+    ret                               ;
+
+
 ; Send byte to MIDI device
 ; Baudrate 31250 for 3.5MHz CPU or 31388 for 3.5469MHz CPU
 ; IN  -   A - byte to send

@@ -36,3 +36,5 @@ var_trdos_cleared_screen DB 0
 
 var_settings settings_t
 var_settings_sector WORD 0
+
+var_shama2695_err DB 0

@@ -13,10 +13,40 @@ PLAYER_FLAG_TITLE_SET equ 0
 PLAYER_FLAG_FF        equ 1
 
 
+player_driver_select:
+    ld a, (var_settings.output)          ;
+    cp 1                                 ;
+    jr z, .shama2095                     ;
+.uart128:
+    ld hl, uart_prepare                  ;
+    ld (player_driver_prepare+1), hl     ;
+    ld hl, uart_putc_txbuf               ;
+    ld (player_driver_tx+1), hl          ;
+    ld (player_loop.A+1), hl             ;
+    ld (player_loop.B+1), hl             ;
+    ld hl, uart_flush_txbuf              ;
+    ld (player_driver_flush_txbuf+1), hl ;
+    ret                                  ;
+.shama2095:
+    ld hl, shama2695_prepare             ;
+    ld (player_driver_prepare+1), hl     ;
+    ld hl, shama2695_tx                  ;
+    ld (player_driver_tx+1), hl          ;
+    ld (player_loop.A+1), hl             ;
+    ld (player_loop.B+1), hl             ;
+    ld hl, shama2695_flush_txbuf         ;
+    ld (player_driver_flush_txbuf+1), hl ;
+    ret                                  ;
+player_driver_prepare:
+    jp 0
+player_driver_tx:
+    jp 0
+player_driver_flush_txbuf:
+    jp 0
+
 
 player_loop:
     xor a                                     ;
-    ld (uart_txbuf_len), a                    ;
     ld (var_player_state.flags), a            ;
     ld (var_player_state.last_int_counter), a ;
     ld (var_player_state.subseconds_l), a     ;
@@ -27,6 +57,8 @@ player_loop:
     ld (var_player_state.minutes_l), a        ;
     ld (var_player_state.minutes_h), a        ;
 .init:
+    call player_driver_select      ;
+    call player_driver_prepare     ;
     call player_reset_chip         ;
     call vis_init                  ;
     call file_get_current_file_name;
@@ -68,7 +100,7 @@ player_loop:
     ; inc a : out (#fe), a           ;
 1:  inc (hl)                       ; increment last_int_counter
 .frame_start:
-    call uart_flush_txbuf          ;
+    call player_driver_flush_txbuf ;
     call input_process             ;
     ld a, b                        ;
     cp INPUT_KEY_RIGHT             ; fast forward while holding right key
@@ -102,13 +134,13 @@ player_loop:
     call vis_process_command       ;
 .status_send:
     ld ixh, b : ld ixl, c          ; IX = data len
-    call uart_putc_txbuf           ; send status
+.A  call player_driver_tx          ; send status. self modifying code! see player_driver_select
 .data_send:
     ld a, ixh                      ; if len == 0 then go for next status
     or ixl                         ; ...
     jr z, .process_current_track   ; ...
     call file_get_next_byte        ; A = data
-    call uart_putc_txbuf           ; send data
+.B  call player_driver_tx          ; send data. self modifying code! see player_driver_select
     dec ix                         ; len--
     jp .data_send                  ; ...
 .next_track:
@@ -124,32 +156,32 @@ player_loop:
     ld a, 1                          ;
     ld (var_player_nextfile_flag), a ;
 .end:
-    call uart_flush_txbuf            ;
+    call player_driver_flush_txbuf   ;
     ; call player_reset_chip           ;
     ; ret                              ;
 
 
 player_reset_chip:
-    ld a, #ff                      ; issue reset status
-    call uart_putc                 ; ...
-    ei : halt                      ; wait 20ms just for safety
-    ld l, #b0                      ; send controller message for channels #0..#f
-    ld a, l                        ;
+    ld a, #ff                         ; issue reset status
+    call player_driver_tx             ; ...
+    ei : halt                         ; wait 20ms just for safety
+    ld l, #b0                         ; send controller message for channels #0..#f
+    ld a, l                           ;
 .loop:
-                call uart_putc     ; channel number
-    ld a, #78 : call uart_putc     ; #78 = All Sound Off
-    xor a     : call uart_putc     ; 0 = value
-    ld a, l   : call uart_putc     ; channel number
-    ld a, #79 : call uart_putc     ; #79 = Reset All Controllers
-    xor a     : call uart_putc     ; 0 = value
-    ld a, l   : call uart_putc     ; channel number
-    ld a, #7b : call uart_putc     ; #7b = All Notes Off
-    xor a     : call uart_putc     ; 0 = value
-    inc l                          ;
-    ld a, l                        ;
-    cp #c0                         ;
-    jr nz, .loop                   ;
-    ret                            ;
+                call player_driver_tx ; channel number
+    ld a, #78 : call player_driver_tx ; #78 = All Sound Off
+    xor a     : call player_driver_tx ; 0 = value
+    ld a, l   : call player_driver_tx ; channel number
+    ld a, #79 : call player_driver_tx ; #79 = Reset All Controllers
+    xor a     : call player_driver_tx ; 0 = value
+    ld a, l   : call player_driver_tx ; channel number
+    ld a, #7b : call player_driver_tx ; #7b = All Notes Off
+    xor a     : call player_driver_tx ; 0 = value
+    inc l                             ;
+    ld a, l                           ;
+    cp #c0                            ;
+    jr nz, .loop                      ;
+    jp player_driver_flush_txbuf      ;
 
 
 ; IN  - DE - string len
