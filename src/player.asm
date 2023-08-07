@@ -131,20 +131,24 @@ player_loop:
 
 player_reset_chip:
     ld a, #ff                      ; issue reset status
-    di : call uart_putc : ei       ; ...
-    halt                           ; wait 20ms just for safety
-    ld ixl, #b0                    ; set controller message for channels #0..#f
-    ld a, ixl                      ;
+    call uart_putc                 ; ...
+    ei : halt                      ; wait 20ms just for safety
+    ld l, #b0                      ; send controller message for channels #0..#f
+    ld a, l                        ;
 .loop:
-    di : call uart_putc : ei       ;
-    ld a, 123                      ; 123 = All notes off (this message stops all the notes that are currently playing)
-    di : call uart_putc : ei       ;
-    xor a                          ; 0 = value
-    di : call uart_putc : ei       ;
-    inc ixl                        ;
-    ld a, ixl                      ;
+                call uart_putc     ; channel number
+    ld a, #78 : call uart_putc     ; #78 = All Sound Off
+    xor a     : call uart_putc     ; 0 = value
+    ld a, l   : call uart_putc     ; channel number
+    ld a, #79 : call uart_putc     ; #79 = Reset All Controllers
+    xor a     : call uart_putc     ; 0 = value
+    ld a, l   : call uart_putc     ; channel number
+    ld a, #7b : call uart_putc     ; #7b = All Notes Off
+    xor a     : call uart_putc     ; 0 = value
+    inc l                          ;
+    ld a, l                        ;
     cp #c0                         ;
-    jp nz, .loop                   ;
+    jr nz, .loop                   ;
     ret                            ;
 
 

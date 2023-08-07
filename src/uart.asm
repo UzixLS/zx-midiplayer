@@ -57,6 +57,7 @@ uart_init:
 ; OUT -  BC - garbage
 ; OUT -  DE - garbage
 uart_putc:
+    di                 ;
     ld e, a            ; Store the byte to send.
     ld bc, #fffd       ;
     ld a, #0e          ;
@@ -115,7 +116,8 @@ uart_putc:
 .E: ld e, 6            ; (7) Delay for 101 T-states (28.5us). Self modifying code! See uart_init.patch_for_cpu_*
 1:  dec e              ; (4)
     jr nz, 1b          ; (12/7)
-    ret                ; (10)
+    ei                 ;
+    ret                ;
 
 
 ; IN  -  A - byte to put into tx buffer
@@ -162,7 +164,7 @@ uart_flush_txbuf:
     ld hl, uart_txbuf        ;
 .loop:                       ;
     ld a, (hl)               ;
-    di : call uart_putc : ei ;
+    call uart_putc           ;
     inc hl                   ;
     dec ixl                  ;
     jp nz, .loop             ;
