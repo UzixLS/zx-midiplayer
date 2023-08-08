@@ -1,55 +1,20 @@
-; Page         128  +3
-; 0 000
-; 1 001        slow
-; 2 010 0x8000
-; 3 011        slow
-; 4 100             slow
-; 5 101 0x4000 slow slow
-; 6 110             slow
-; 7 111 altscr slow slow
-
-    align 8
-file_pages: db #10, #14, #16, #13
-
-file_base_addr equ #c000
-file_page_size equ #4000
+; TR-DOS directory entry:
+; 0......7 8 9  B  D E F
+; NNNNNNNN T AA LL C S T
+; N  - file name
+; T  - file type
+; AA - start address for "C" file, full file length for "B" file
+; LL - full file lenghth for "C" file, program length for "B" file
+; C  - sectors count
+; S  - starting sector
+; T  - starting tracl
 
 
-; IN  - HL - file position
-; OUT -  A - data
-; OUT - HL - next file position
-; OUT -  F - garbage
-; OUT - BC - garbage
-file_get_next_byte:
-    ld a, h                          ; compare requested page with current page
-    and #c0                          ; ... page_number = position[7:6]
-.pg:cp #0f                           ; ... self modifying code! see bellow and file_load
-    jp z, .get                       ; ...
-.switch_page:
-    ld (.pg+1), a                    ;
-    ld bc, file_pages                ; A = *(file_pages + (page_number >> 6))
-    rlca : rlca                      ; ...
-    add a, c                         ; ...
-    ld c, a                          ; ...
-    ld a, (bc)                       ; ...
-    ld bc, #7ffd                     ;
-    out (c), a                       ;
-.get:
-    ld a, h                          ; position = position[5:0]
-    and #3f                          ; ...
-    add a, high file_base_addr       ; A = *(base_addr + position)
-    ld b, a                          ; ...
-    ld c, l                          ; ...
-    ld a, (bc)                       ; ...
-    inc hl                           ; position++
-    ret                              ;
-
-
-
+trdos_disks                  equ 4
 trdos_sector_size            equ 256
 trdos_max_files              equ 128
 trdos_file_header_size       equ 16
-trdos_catalogue_sectors      equ (trdos_max_files*trdos_file_header_size)/trdos_sector_size
+trdos_directory_sectors      equ (trdos_max_files*trdos_file_header_size)/trdos_sector_size
 
 trdos_var_next_sector        equ #5cf4
 trdos_var_next_track         equ #5cf5
@@ -89,6 +54,7 @@ trdos_fun_select_side_1      equ #17
 trdos_fun_reconfig_floppy    equ #18
 
 
+
 trdos_basic_interceptor:
     ex (sp), hl                      ;
     push af                          ;
@@ -125,7 +91,7 @@ trdos_err_handler:
     ret                     ;
 
 
-; OUT -  F - Z when ok, NZ when not ok
+; OUT -  F - Z on success, NZ on fail
 trdos_exec_fun:
     push iy                                ;
     push af                                ;
@@ -176,43 +142,44 @@ trdos_exec_fun:
     ret                                    ;
 
 
-; OUT -  F - Z when ok, NZ when not ok
-; OUT - AF - garbage
+; OUT -  F - Z on success, NZ on fail
+; OUT -  A - garbage
 ; OUT - BC - garbage
 ; OUT - DE - garbage
 ; OUT - HL - garbage
 ; OUT - IX - garbage
-file_load_catalogue:
+trdos_directory_load:
     xor a                                 ; set zero byte to first file name - same as clearing file list
-    ld (file_buffer), a                   ; ...
+    ld (disk_buffer), a                   ; ...
     ld c, trdos_fun_select_drive          ; select drive A/B/C/D
-    ld a, (var_current_drive)             ; ...
+    ld a, (var_disks.current_n)           ; ...
     call trdos_exec_fun                   ; ...
     ret nz                                ;
     ld c, trdos_fun_reconfig_floppy       ; init floppy disk parameters
     call trdos_exec_fun                   ; ...
     ret nz                                ;
     ld c, trdos_fun_read_block            ; read file table
-    ld hl, file_buffer                    ; ...
-    ld b, trdos_catalogue_sectors         ; ...
+    ld hl, disk_buffer                    ; ...
+    ld b, trdos_directory_sectors         ; ...
     ld de, #0000                          ; ...
     call trdos_exec_fun                   ; ...
     ret nz                                ;
-    call file_catalogue_optimize          ;
-    call file_catalogue_format_extensions ;
+    call trdos_directory_optimize         ;
+    call trdos_directory_format_extensions ;
     xor a                                 ; Z=1
     ret                                   ;
+
 
 ; OUT - AF - garbage
 ; OUT -  B - garbage
 ; OUT - DE - garbage
 ; OUT - HL - garbage
 ; OUT - IX - garbage
-file_catalogue_optimize:          ; reorganize catalogue to skip all deleted files
+trdos_directory_optimize:         ; reorganize directory to skip all deleted files
     ld b, trdos_max_files         ;
     ld de, trdos_file_header_size ;
-    ld hl, file_buffer            ; HL = pointer for entries_all
-    ld ix, file_buffer            ; IX = pointer for entries_good
+    ld hl, disk_buffer            ; HL = pointer for entries_all
+    ld ix, disk_buffer            ; IX = pointer for entries_good
 .loop:
     ld a, (hl)                    ;
     or a                          ; if first byte == #00 - no entry
@@ -228,35 +195,36 @@ file_catalogue_optimize:          ; reorganize catalogue to skip all deleted fil
     jr nz, .good_entry            ; ...
     ld e, trdos_file_header_size  ;
     djnz .loop                    ;
-    jp .exit                      ;
+    jr .exit                      ;
 .bad_entry:
     add hl, de                    ; HL += trdos_file_header_size
     djnz .loop                    ;
 .exit:
     xor a                         ; place NULL byte to the last entry. This entry may be +1 byte above trdos_max_files*trdos_file_header_size
-    ld (ix), a                    ; ... boundary. So file_buffer should be at least trdos_max_files*trdos_file_header_size+1 bytes
+    ld (ix), a                    ; ... boundary. So disk_buffer should be at least trdos_max_files*trdos_file_header_size+1 bytes
     ret                           ;
+
 
 ; OUT - AF - garbage
 ; OUT -  B - garbage
 ; OUT - DE - garbage
 ; OUT - HL - garbage
 ; OUT - IX - garbage
-file_catalogue_format_extensions:
+trdos_directory_format_extensions:
     ld b, trdos_max_files         ;
     ld de, trdos_file_header_size ;
-    ld ix, file_buffer            ;
+    ld ix, disk_buffer            ;
 .loop:
     ld a, (ix+9)                  ; if 2nd and 3rd extensions symbols are in ascii range - assume extension is 3-chars-wide
     cp '0'                        ; ...
-    jp c, .invalid_extension      ; ...
+    jr c, .invalid_extension      ; ...
     cp 'z'+1                      ; ...
-    jp nc, .invalid_extension     ; ...
+    jr nc, .invalid_extension     ; ...
     ld a, (ix+10)                 ; ...
     cp '0'                        ; ...
-    jp c, .invalid_extension      ; ...
+    jr c, .invalid_extension      ; ...
     cp 'z'+1                      ; ...
-    jp nc, .invalid_extension     ; ...
+    jr nc, .invalid_extension     ; ...
     add ix, de                    ;
     djnz .loop                    ;
 .invalid_extension:
@@ -268,235 +236,167 @@ file_catalogue_format_extensions:
     ret                           ;
 
 
-; IN  - IX - pointer to byte after 3-char file extension string
-; OUT - A  - icon
-; OUT - F  - garbage
-file_menu_generator_get_icon:
-.check_mid_extension:
-    ld a, (ix-3)                         ; if extension is "mid" - set appropriate icon
-    cp 'm' : jr z, 1f                    ;
-    cp 'M' : jr nz, .check_rmi_extension ;
-1:  ld a, (ix-2)                         ;
-    cp 'i' : jr z, 1f                    ;
-    cp 'I' : jr nz, .check_rmi_extension ;
-1:  ld a, (ix-1)                         ;
-    cp 'd' : jr z, .set_icon             ;
-    cp 'D' : jr z, .set_icon             ;
-.check_rmi_extension:
-    ld a, (ix-3)                         ; if extension is "rmi" - set appropriate icon
-    cp 'r' : jr z, 1f                    ;
-    cp 'R' : jr nz, .no_icon             ;
-1:  ld a, (ix-2)                         ;
-    cp 'm' : jr z, 1f                    ;
-    cp 'M' : jr nz, .no_icon             ;
-1:  ld a, (ix-1)                         ;
-    cp 'i' : jr z, .set_icon             ;
-    cp 'I' : jr z, .set_icon             ;
-.no_icon:
-    ld a, ' '                            ; if extension isn't recognized - set empty icon (space)
-    ret                                  ;
-.set_icon:
-    ld a, udg_melody                     ;
-    ret                                  ;
-
-
-; IN  - DE - entry number
-; OUT -  F - NZ when ok, Z when not ok
+; IN  - DE - entry number (<128)
+; OUT -  F - Z on success, NZ on fail
 ; OUT - IX - pointer to 0-terminated string
 ; OUT -  A - garbage
 ; OUT - BC - garbage
 ; OUT - DE - garbage
 ; OUT - HL - garbage
-file_menu_generator:
-    xor a                     ; if (entry_number >= 128) - return not ok
-    or d                      ; ...
-    jp z, 1f                  ; ...
-    xor a                     ; ... set Z flag
-    ret                       ; ...
-1:  ld a, e                   ; ...
-    cp trdos_max_files        ; ...
-    jp c, 1f                  ; ...
-    xor a                     ; ... set Z flag
-    ret                       ; ...
-1:  sla e : rl d              ; entry_number = entry_number * 16
-    sla e : rl d              ; ...
-    sla e : rl d              ; ...
-    sla e : rl d              ; ...
-    ld hl, file_buffer        ; HL = file_buffer + entry_number * 16
+trdos_file_menu_generator:
+    ex de, hl                 ; HL = disk_buffer + entry_number * 16
+    .4 add hl, hl             ; ...
+    ld de, disk_buffer        ; ...
     add hl, de                ; ...
     ld a, (hl)                ; if first byte == 0x00 or 0xFF - return error (no entry)
     or a                      ; ...
-    ret z                     ; ...
+    jr z, .noentry            ; ...
     inc a                     ; ...
-    ret z                     ; ...
-    ld ix, tmp_menu_string+2  ;
-    ld b, 8                   ;
-.filenamecopy:                ;
-    ld a, (hl)                ;
-    ld (ix), a                ;
-    inc hl                    ;
-    inc ix                    ;
-    djnz .filenamecopy        ;
+    jr z, .noentry            ; ...
+    ld de, tmp_menu_string+2  ;
+.name:
+    ld bc, 8                  ;
+    ldir                      ;
+.dot:
     ld a, '.'                 ;
-    ld (ix), a                ;
-    inc ix                    ;
-    ld b, 3                   ;
-.extcopy:
-    ld a, (hl)                ;
-    ld (ix), a                ;
-    inc hl                    ;
-    inc ix                    ;
-    djnz .extcopy             ;
+    ld (de), a                ;
+    inc de                    ;
+.ext:
+    push hl                   ;
+    ld c, 3                   ;
+    ldir                      ;
 .filesize:
     ld a, ' '                 ;
-    ld (ix), a                ;
+    ld (de), a                ;
+    inc de                    ;
     ld a, '$'                 ;
-    ld (ix+1), a              ;
-    ld a, (hl)                ; print file_size[2]
-    and #f0                   ; ...
-    .4 rra                    ; ...
-    add a, #90                ; ...
-    daa                       ; ...
-    adc a, #40                ; ...
-    daa                       ; ...
-    ld (ix+4), a              ; ...
-    ld a, (hl)                ; print file_size[3]
-    and #0f                   ; ...
-    add a, #90                ; ...
-    daa                       ; ...
-    adc a, #40                ; ...
-    daa                       ; ...
-    ld (ix+5), a              ; ...
+    ld (de), a                ;
+    inc de                    ;
     inc hl                    ;
-    ld a, (hl)                ; print file_size[0]
+    ld b, 2                   ;
+1:  ld a, (hl)                ; hi
     and #f0                   ; ...
     .4 rra                    ; ...
     add a, #90                ; ...
     daa                       ; ...
     adc a, #40                ; ...
     daa                       ; ...
-    ld (ix+2), a              ; ...
-    ld a, (hl)                ; print file_size[1]
+    ld (de), a                ; ...
+    inc de                    ; ...
+    ld a, (hl)                ; lo
     and #0f                   ; ...
     add a, #90                ; ...
     daa                       ; ...
     adc a, #40                ; ...
     daa                       ; ...
-    ld (ix+3), a              ; ...
+    ld (de), a                ; ...
+    inc de                    ; ...
+    dec hl                    ;
+    djnz 1b                   ;
 .null:
     xor a                     ; write NULL byte to the end of string
-    ld (ix+6), a              ; ...
+    ld (de), a                ; ...
 .icon:
-    call file_menu_generator_get_icon ; A = icon
+    pop hl                    ;
+    call disks_get_icon_by_extension ; A = icon
     ld ix, tmp_menu_string    ;
     ld (ix), a                ;
     ld a, ' '                 ; space
     ld (ix+1), a              ;
-    or 1                      ; set NZ flag
+    xor a                     ; set Z flag
+    ret                       ;
+.noentry:
+    or 1                      ;
     ret                       ;
 
 
-; OUT - IX - pointer to 0-terminated string
-; OUT - AF - garbage
-file_get_current_file_name:
-    ld a, (var_current_file_number+0) ;
-    ld e, a                           ;
-    ld a, (var_current_file_number+1) ;
-    ld d, a                           ;
-    call file_menu_generator          ;
-    .2 inc ix                         ; skip icon
-    xor a                             ; remove size
-    ld (ix+8+1+3), 0                  ; ...
-    ret                               ;
-
-; OUT - BC - file size
-file_get_current_file_size:
-    ld a, (var_current_file_size+0)   ;
-    ld c, a                           ;
-    ld a, (var_current_file_size+1)   ;
-    ld b, a                           ;
-    ret                               ;
-
-
 ; IN  -  E - file number [0..127]
-; OUT -  F - Z when ok, NZ when not ok
+; OUT -  F - Z on success, NZ on fail
 ; OUT -  A - garbage
 ; OUT - BC - garbage
 ; OUT - DE - garbage
 ; OUT - HL - garbage
 ; OUT - IX - garbage
-file_load:
+trdos_file_load:
     xor a                                   ;
     ld (var_current_file_number+1), a       ;
     ld a, e                                 ;
     ld (var_current_file_number+0), a       ;
-.select_page:
-    ld a, (file_pages)                      ; select first page for file
-    ld bc, #7ffd                            ; ...
-    out (c), a                              ; ...
 .load_file_params:
     sla e : rl d                            ; entry_number = entry_number * 16
     sla e : rl d                            ; ...
     sla e : rl d                            ; ...
     sla e : rl d                            ; ...
-    ld ix, file_buffer                      ; IX = file_buffer + entry_number * 16
-    add ix, de                              ; ...
-    ld a, (ix+#0)                           ; if name[0] == NULL - incorrect entry, exit
+    ld hl, disk_buffer                      ; HL = disk_buffer + entry_number * 16
+    add hl, de                              ; ...
+    ld a, (hl)                              ; if name[0] == NULL - incorrect entry, exit
     or a                                    ; ...
     jr nz, 1f                               ; ...
     or 1                                    ; ... set NZ flag
     ret                                     ; ...
-1:  ld a, (ix+#b)                           ; file size in bytes
-    ld (var_current_file_size+0), a         ; ...
-    ld a, (ix+#c)                           ; ...
-    ld (var_current_file_size+1), a         ; ...
-    ld b, (ix+#d)                           ; sectors count
-    ld e, (ix+#e)                           ; sector n
-    ld d, (ix+#f)                           ; track n
+1:  ld de, var_current_file_name            ; copy file name
+    ld bc, 8                                ; ...
+    ldir                                    ; ...
+    ld a, '.' : ld (de), a : inc de         ; ... '.'
+    ld bc, 3                                ; ... extension
+    ldir                                    ; ...
+    ld b, (hl) : inc hl                     ; file size in bytes
+    ld c, (hl) : inc hl                     ; ...
+    ld (var_current_file_size), bc          ; ...
+    ld b, (hl) : inc hl                     ; sectors count
+    ld e, (hl) : inc hl                     ; sector n
+    ld d, (hl) : inc hl                     ; track n
     ld c, trdos_fun_read_block              ;
-    ld hl, file_pages                       ; HL = pointer to pages table
+    ld hl, 0                                ; HL = current_file_position
 .loop:
-    push bc                                 ;
     push hl                                 ;
+    push bc                                 ;
+    push bc                                 ;
+    call file_switch_page                   ;
+    pop bc                                  ;
     ld a, file_page_size/trdos_sector_size  ; if (sectors_count > max) sector_count = max
     cp b                                    ; ...
-    jp nc, 1f                               ; ...
+    jr nc, 1f                               ; ...
     ld b, a                                 ; ...
 1:  ld hl, file_base_addr                   ;
     call trdos_exec_fun                     ; memcpy( hl, de, b )
-    pop hl                                  ;
     pop bc                                  ;
+    pop hl                                  ;
     ret nz                                  ;
 .loop_check_next_page:
-    ld a, b                                 ; B = B - 64
+    ld a, b                                 ; sectors_count -= 64
     sub file_page_size/trdos_sector_size    ; ...
     ld b, a                                 ; ...
-    jp c, .exit                             ; if (B <= 0) exit
-    jp z, .exit                             ; ...
-    ld d, b                                 ;
-    inc hl                                  ; set next page
-    ld a, (hl)                              ; ...
-    ld bc, #7ffd                            ; ...
-    out (c), a                              ; ...
-    ld b, d                                 ; B = sectors left
-    ld c, trdos_fun_read_block              ;
-    ld de, (trdos_var_next_sector)          ; DE = next position
-    jp .loop                                ;
+    jr c, .exit                             ; if (sectors_count <= 0) exit
+    jr z, .exit                             ; ...
+    ld a, high file_page_size               ; current_file_position += page_size
+    add a, h                                ; ...
+    ld h, a                                 ; ...
+    ld de, (trdos_var_next_sector)          ;
+    jr .loop                                ;
 .exit:
-    ld a, #0f                               ; reset page
-    ld (file_get_next_byte.pg+1), a         ; ...
-    xor a                                   ; Z=1
+    xor a                                   ; set Z flag
     ret                                     ;
 
 
-file_init:
-    ld a, (trdos_var_current_drive) ;
-    ld (var_boot_drive), a          ;
-    ld (var_current_drive), a       ;
-    ld a, (var_trdos_present)       ; if there is no trdos - stub trdos_exec_fun()
+; OUT -  F - Z=1 (no)
+; OUT -  A - 0
+trdos_entry_is_directory:
+    xor a                           ;
+    ret                             ;
+
+
+trdos_init:
+    ld a, (var_trdos_present)       ;
     or a                            ;
-    ret nz                          ;
-    ld hl, trdos_exec_fun           ; ...
+    jr z, .no_trdos                 ;
+.trdos_ok:
+    ld a, (trdos_var_current_drive) ;
+    ld (var_disks.boot_n), a        ;
+    ld (var_disks.current_n), a     ;
+    ret                             ;
+.no_trdos:
+    ld hl, trdos_exec_fun           ; if there is no trdos - stub trdos_exec_fun()
     ld (hl), #f6 : inc hl           ; ... or 1
     ld (hl), #01 : inc hl           ; ...
     ld (hl), #c9                    ; ... ret

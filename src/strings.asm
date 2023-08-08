@@ -18,14 +18,9 @@ str_untitled:    DEFSTR "Untitled MIDI melody"
 str_unnamed:     DEFSTR "untitled.mid"
 str_zerotimer:   DEFSTR "00:00.0"
 
-str_drive_a:     DEFSTR "A:"
-str_drive_b:     DEFSTR "B:"
-str_drive_c:     DEFSTR "C:"
-str_drive_d:     DEFSTR "D:"
 str_help:        DEFSTR "Help"
 str_settings:    DEFSTR "Settings"
 str_exit:        DEFSTR "Exit"
-
 
 str_output:      DEFSTR "Output"
 str_128:         DEFSTR "128 Std"

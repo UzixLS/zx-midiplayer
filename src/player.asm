@@ -57,19 +57,22 @@ player_loop:
     ld (var_player_state.minutes_l), a        ;
     ld (var_player_state.minutes_h), a        ;
 .init:
+    ld hl, 0                       ;
+    call file_switch_page          ;
     call player_driver_select      ;
     call player_driver_prepare     ;
     call player_reset_chip         ;
     call vis_init                  ;
-    call file_get_current_file_name;
+    ld ix, var_current_file_name   ;
     call player_set_filename       ;
-    call smf_get_bytes_left        ;
+    ld ix, (var_smf_file.bytes_left);
     call player_set_size           ;
-    call smf_get_num_tracks        ;
+    ld a, (var_smf_file.num_tracks);
     call player_set_tracks         ;
-    call smf_get_ppqn              ;
+    ld bc, (var_smf_file.ppqn)     ;
     call player_set_ppqn           ;
-    call smf_get_tempo             ;
+    ld a, (var_smf_file.tempo+2)   ;
+    ld ix, (var_smf_file.tempo)    ;
     call player_set_tempo          ;
     call player_redraw_buttons     ;
     ld a, (var_int_counter)        ;
@@ -333,8 +336,7 @@ player_update_timer:
     ld (var_player_state.subseconds_h), a            ;
     call print_char                                  ; print subsecond = 0
 .next_second_l:
-    ; call smf_get_bytes_left                        ; update size every second
-    ld ix, (var_smf_file.bytes_left)                 ; ...
+    ld ix, (var_smf_file.bytes_left)                 ; update size every second
     call player_set_size                             ; ...
     LD_SCREEN_ADDRESS hl, LAYOUT_TIMER+4             ;
     ld a, (var_player_state.seconds_l)               ;

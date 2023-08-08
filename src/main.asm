@@ -43,7 +43,10 @@ int_im2_vector_table:
     include "menu.asm"
     include "menugen.asm"
     include "device.asm"
-    include "file.asm"
+    include "fatfs.asm"
+    include "disk.asm"
+    include "trdos.asm"
+    include "mmc.asm"
     include "settings.asm"
     include "uart.asm"
     include "shama2695.asm"
@@ -66,8 +69,9 @@ main:
     call device_detect_cpu_int      ;
     call uart_init                  ;
     call input_detect_kempston      ;
-    call file_init                  ;
+    call trdos_init                 ;
     call settings_load              ;
+    call disks_init                 ;
     ld iy, main_menu                ;
     call menu_init                  ;
     ld iy, right_menu               ;
@@ -191,6 +195,7 @@ play_file:
     dec a                            ; ...
     ret nz                           ; ... or exit if isn't set
 .load_next_file:
+    ld iy, right_menu                ;
     ld (var_player_nextfile_flag), a ; reset nextfile flag
     ld b, LOAD_NEXT_FILE_DELAY       ; just cosmetic delay
 1:  ei : halt                        ; ...
@@ -220,32 +225,23 @@ play_file:
     jp menu_handle_input             ; ...
 
 
-; IN  - DE - entry number (assume < 128)
+; IN  - DE - entry number
+; IN  - IY - *menu_t
 file_menu_callback:
-    call file_load      ;
-    jp z, play_file     ; Z=0 - ok
-    ld a, LAYOYT_ERR_FE ;
-    out (#fe), a        ;
-    ret                 ;
+    call disk_entry_is_directory ;
+    jr z, .is_file               ;
+    call disk_directory_load     ;
+    jr nz, .err                  ;
+    call menu_init               ;
+    jp menu_draw                 ;
+.is_file:
+    call disk_file_load          ;
+    jp z, play_file              ; Z=1 - ok
+.err:
+    ld a, LAYOYT_ERR_FE          ;
+    out (#fe), a                 ;
+    ret                          ;
 
-; IN - E - drive number
-main_menu_drive_select:
-    ld a, e                                                    ;
-    ld (var_current_drive), a                                  ;
-    call file_load_catalogue                                   ;
-    push af                                                    ;
-    ld iy, right_menu                                          ;
-    ld (iy+menu_t.generator_fun+0), low  file_menu_generator   ;
-    ld (iy+menu_t.generator_fun+1), high file_menu_generator   ;
-    ld (iy+menu_t.callback_fun+0),  low  file_menu_callback    ;
-    ld (iy+menu_t.callback_fun+1),  high file_menu_callback    ;
-    call menu_init                                             ;
-    call menu_draw                                             ;
-    pop af                                                     ;
-    jp z, menu_main_right_toggle                               ;
-    ld a, LAYOYT_ERR_FE                                        ;
-    out (#fe), a                                               ;
-    jp menu_style_inactive                                     ;
 
 main_menu_settings:
     ld iy, right_menu                                          ;
@@ -259,20 +255,61 @@ main_menu_settings:
     call menu_draw                                             ;
     jp menu_main_right_toggle                                  ;
 
+
+; IN  - DE - entry number (<256)
+; IN  - IY - *menu_t
+; OUT -  F - Z on success, NZ on fail
+main_menu_generator:
+    ld a, (var_disks.count)                                            ; if (entry_number < disks_count) - return disk entry
+    sub e                                                              ; ...
+    jr z, .static_menu_entry                                           ; ...
+    jr c, .static_menu_entry                                           ; ...
+.disk_menu_entry:
+    jp disks_menu_generator                                            ;
+.static_menu_entry:
+    neg                                                                ;
+    ld e, a                                                            ;
+    jp menugen_generator                                               ;
+
+; IN  - DE - entry number (<256)
+; IN  - IY - *menu_t
+main_menu_callback:
+    ld a, (var_disks.count)                                            ; if (entry_number < disks_count) - return disk entry
+    sub e                                                              ; ...
+    jr z, .static_menu_entry                                           ; ...
+    jr c, .static_menu_entry                                           ; ...
+.disk_menu_entry:
+    call disk_change                                                   ;
+    ld de, #ffff                                                       ;
+    call disk_directory_load                                           ;
+    push af                                                            ;
+    ld iy, right_menu                                                  ;
+    ld (iy+menu_t.generator_fun+0), low  disk_directory_menu_generator ;
+    ld (iy+menu_t.generator_fun+1), high disk_directory_menu_generator ;
+    ld (iy+menu_t.callback_fun+0),  low  file_menu_callback            ;
+    ld (iy+menu_t.callback_fun+1),  high file_menu_callback            ;
+    call menu_init                                                     ;
+    call menu_draw                                                     ;
+    pop af                                                             ;
+    jp z, menu_main_right_toggle                                       ;
+    ld a, LAYOYT_ERR_FE                                                ;
+    out (#fe), a                                                       ;
+    jp menu_style_inactive                                             ;
+.static_menu_entry:
+    neg                                                                ;
+    ld e, a                                                            ;
+    jp menugen_callback                                                ;
+
 main_menu_entries:
-    menugen_t 7
-    menugen_entry_t str_drive_a  0 main_menu_drive_select 0
-    menugen_entry_t str_drive_b  0 main_menu_drive_select 1
-    menugen_entry_t str_drive_c  0 main_menu_drive_select 2
-    menugen_entry_t str_drive_d  0 main_menu_drive_select 3
+    menugen_t 3
     menugen_entry_t str_settings 0 main_menu_settings
     menugen_entry_t str_help     0 help
     menugen_entry_t str_exit     0 exit
 
 main_menu: menu_t {
-    menugen_generator
-    menugen_count
-    menugen_callback
+    main_menu_generator
+    0
+    main_menu_callback
     main_menu_entries
     LAYOUT_MAINMENU_Y
     LAYOUT_MAINMENU_X

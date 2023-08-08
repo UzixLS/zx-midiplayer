@@ -22,7 +22,7 @@ menugen_count:
 
 ; IN  - DE - entry number
 ; IN  - IY - *menu_t
-; OUT -  F - NZ when ok, Z when not ok
+; OUT -  F - Z on success, NZ on fail
 ; OUT - IX - pointer to 0-terminated string
 ; OUT -  A - garbage
 ; OUT -  B - garbage
@@ -61,8 +61,7 @@ menugen_generator:
     ld (de), a                            ; ...
     inc ix                                ; ...
     inc de                                ; ...
-    dec b                                 ; ...
-    jr nz, .save_tmp_string1              ; ...
+    djnz .save_tmp_string1                ; ...
 .fill_tail_with_spaces:
     xor a                                 ; fill tail with ' '
     or b                                  ; ...
@@ -92,10 +91,10 @@ menugen_generator:
     jr .save_tmp_string2                  ; ...
 1:  ld ix, tmp_menu_string                ;
 .done:
-    or 1                                  ; set NZ flag
+    xor a                                 ; set Z flag
     ret                                   ;
 .no_entry:
-    xor a                                 ; set Z flag
+    or 1                                  ; set NZ flag
     ret                                   ;
 .jp_hl:
     jp (hl)                               ;

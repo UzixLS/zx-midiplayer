@@ -1,5 +1,5 @@
     STRUCT menu_t
-generator_fun   WORD ; IN - DE - entry number ; OUT -  F - NZ when ok, Z when not ok ; OUT - IX - pointer to 0-terminated string
+generator_fun   WORD ; IN - DE - entry number ; OUT -  F - Z on success, NZ on fail ; OUT - IX - pointer to 0-terminated string
 count_fun       WORD ; OUT - DE - total entries count
 callback_fun    WORD ; IN - DE - entry number
 context         WORD
@@ -96,7 +96,7 @@ menu_draw:
     push bc                             ;
     call menu_call_generator            ; IX = string_pointer
     pop bc                              ;
-    jr z, .exit2                        ;
+    jr nz, .exit2                       ;
     ld h, c                             ; print IX
     ld l, (iy+menu_t.x_left)            ; ...
     push bc                             ;
@@ -171,7 +171,7 @@ menu_down:
     add hl, de                          ; ...
     ex de, hl                           ; ...
     call menu_call_generator            ; IX = string_pointer
-    ret z                               ;
+    ret nz                              ;
     inc (iy+menu_t._top_entry_n+0)      ; top_entry_n++
     jr nc, .scroll                      ; ...
     inc (iy+menu_t._top_entry_n+1)      ; ...
@@ -219,7 +219,7 @@ menu_up:
     push de                             ;
     call menu_call_generator            ; IX = string_pointer
     pop de                              ;
-    ret z                               ;
+    ret nz                              ;
     ld (iy+menu_t._top_entry_n+0), e    ; top_entry_n--
     ld (iy+menu_t._top_entry_n+1), d    ; ...
 .scroll:
@@ -347,6 +347,7 @@ menu_handle_input:
 
 ; IN  - DE - entry number
 ; IN  - IY - *menu_t
+; OUT -  F - Z on success, NZ on fail
 ; OUT - IX - pointer to 0-terminated string
 ; OUT - AF - garbage
 ; OUT - BC - garbage
@@ -396,10 +397,10 @@ menu_dummy_callback:
 ;     ld b, 0
 ;     ld c, a
 ;     add ix, bc
-;     or 1
+;     xor a
 ;     ret
 ; .no_more_entries:
-;     xor a
+;     or 1
 ;     ret
 ; .string:
 ;     db "test 00",0,"Test 01",0,"test 02",0,"Test 03",0,"test 04",0,"Test 05",0,"test 06",0,"Test 07",0,"test 08",0,"Test 09",0,"test 10",0,"Test 11",0,"test 12",0,"Test 13",0,"test 14",0

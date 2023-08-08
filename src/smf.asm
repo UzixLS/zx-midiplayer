@@ -182,25 +182,6 @@ smf_parse:
     ret                                   ;
 
 
-; OUT - IX - bytes count to be played
-smf_get_bytes_left:
-    ld ix, (var_smf_file.bytes_left) ;
-    ret                              ;
-
-; OUT - A - tracks
-smf_get_num_tracks:
-    ld a, (var_smf_file.num_tracks) ;
-    ret                             ;
-
-; OUT - BC - ppqn
-; OUT - A - garbage
-smf_get_ppqn:
-    ld a, (var_smf_file.ppqn+0)     ;
-    ld c, a                         ;
-    ld a, (var_smf_file.ppqn+1)     ;
-    ld b, a                         ;
-    ret                             ;
-
 ; OUT - CIX - tempo
 smf_get_tempo:
     ld a, (var_smf_file.tempo+0)    ;

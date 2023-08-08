@@ -11,7 +11,7 @@ _reserv     BLOCK 256-8, 0
     ENDS
 
 
-; OUT -  F - Z when ok, NZ when not ok
+; OUT -  F - Z on success, NZ on fail
 ; OUT - SP[0:sizeof(settings_t)-1] - loaded setting (only when ok)
 settings_load0:
     ld de, (var_settings_sector)                              ; error if var_setting_sector == 0
@@ -21,7 +21,7 @@ settings_load0:
     or 1                                                      ; ... set NZ flag
     ret                                                       ; ...
 1:  ld c, trdos_fun_select_drive                              ; select drive A/B/C/D
-    ld a, (var_boot_drive)                                    ; ...
+    ld a, (var_disks.boot_n)                                  ; ...
     call trdos_exec_fun                                       ; ...
     ret nz                                                    ; ... exit on error
     ld c, trdos_fun_reconfig_floppy                           ; ... init floppy disk parameters
@@ -54,7 +54,7 @@ settings_load0:
     jp (hl)                                                   ;
 
 
-; OUT -  F - Z when ok, NZ when not ok
+; OUT -  F - Z on success, NZ on fail
 settings_load:
     call settings_load0                                       ;
     ret nz                                                    ;
@@ -67,7 +67,7 @@ settings_load:
     ret                                                       ;
 
 
-; OUT -  F - Z when ok, NZ when not ok
+; OUT -  F - Z on success, NZ on fail
 settings_save:
     call settings_load0                                       ; check if user didn't changed floppy disk
     ret nz                                                    ; ...
@@ -87,7 +87,7 @@ settings_save:
 
 
 settings_apply:
-    ret
+    jp disks_init                                             ;
 
 
 
@@ -99,6 +99,8 @@ settings_menu_ok_cb:
     ld (iy+menu_t.context+0),       low  menu_dummy_callback  ;
     ld (iy+menu_t.context+1),       high menu_dummy_callback  ;
     call menu_init                                            ;
+    call menu_draw                                            ;
+    ld iy, main_menu                                          ;
     call menu_draw                                            ;
     jp menu_main_right_toggle                                 ;
 

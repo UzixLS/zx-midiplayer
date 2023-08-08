@@ -7,3 +7,8 @@ PIANO_KEYS_FIRST        equ 12
 LOAD_NEXT_FILE_DELAY    equ 10
 
 SMF_MAX_TRACKS          equ 60
+
+MMC_INIT_TIMEOUT        equ 4000/20
+MMC_READ_TIMEOUT        equ 4000/20
+
+DISKS_MAX_COUNT         equ 10
