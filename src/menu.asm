@@ -142,7 +142,8 @@ menu_style_inactive:
 
 
 ; IN  - IY - *menu_t
-; OUT - AF - garbage
+; OUT -  F - Z on success, NZ on fail
+; OUT -  A - garbage
 ; OUT - BC - garbage
 ; OUT - DE - garbage
 ; OUT - HL - garbage
@@ -150,7 +151,7 @@ menu_style_inactive:
 menu_down:
     ld a, (iy+menu_t._lines_used)       ; exit if menu is empty
     or a                                ; ...
-    ret z                               ; ...
+    jr z, .err                          ; ...
     ld a, (iy+menu_t._cursor_line)      ; if cursor on last line - move viewport down
     inc a                               ; ...
     ld b, (iy+menu_t.lines)             ; ...
@@ -158,10 +159,12 @@ menu_down:
     jr z, .get_next_entry               ; ...
     ld b, (iy+menu_t._lines_used)       ; else if there is not all lines are used - exit
     cp b                                ; ...
-    ret z                               ; ...
+    jr z, .err                          ; ...
     call menu_erase_cursor              ; else move cursor down
     inc (iy+menu_t._cursor_line)        ; ...
-    jp menu_draw_cursor                 ; ...
+    call menu_draw_cursor               ; ...
+    xor a                               ; set Z flag
+    ret                                 ;
 .get_next_entry:
     ld e, (iy+menu_t._top_entry_n+0)    ; DE = next entry number
     ld d, (iy+menu_t._top_entry_n+1)    ; ...
@@ -193,7 +196,12 @@ menu_down:
     add (iy+menu_t._lines_used)         ;
     dec a                               ;
     ld h, a                             ;
-    jp print_string0_at                 ;
+    call print_string0_at               ;
+    xor a                               ; set Z flag
+    ret                                 ;
+.err:
+    or 1                                ; set NZ flag
+    ret                                 ;
 
 
 ; IN  - IY - *menu_t
@@ -208,13 +216,15 @@ menu_up:
     jr z, .get_prev_entry               ; ...
     call menu_erase_cursor              ; else move cursor up
     dec (iy+menu_t._cursor_line)        ; ...
-    jp menu_draw_cursor                 ; ...
+    call menu_draw_cursor               ; ...
+    xor a                               ; set Z flag
+    ret                                 ;
 .get_prev_entry:
     ld e, (iy+menu_t._top_entry_n+0)    ; DE = prev entry number
     ld d, (iy+menu_t._top_entry_n+1)    ; ...
     ld a, d                             ;
     or e                                ;
-    ret z                               ;
+    jr z, .err                          ;
     dec de                              ;
     push de                             ;
     call menu_call_generator            ; IX = string_pointer
@@ -225,7 +235,7 @@ menu_up:
 .scroll:
     ld a, (iy+menu_t.lines)             ; if not all lines are used currently - update counter
     cp (iy+menu_t._lines_used)          ; ...
-    jp z, .scroll1                      ; ...
+    jr z, .scroll1                      ; ...
     inc (iy+menu_t._lines_used)         ; ...
 .scroll1:
     push ix                             ;
@@ -242,8 +252,12 @@ menu_up:
     pop ix                              ;
     ld h, (iy+menu_t.y_top)             ;
     ld l, (iy+menu_t.x_left)            ;
-    jp print_string0_at                 ;
-
+    call print_string0_at               ;
+    xor a                               ; set Z flag
+    ret                                 ;
+.err:
+    or 1                                ; set NZ flag
+    ret                                 ;
 
 ; IN  - IY - *menu_t
 ; OUT - AF - garbage
@@ -315,7 +329,8 @@ menu_pageup:
 
 
 ; IN  - IY - *menu_t
-; OUT - AF - garbage
+; OUT -  F - valid only for up/down keys - Z on success, NZ on fail
+; OUT -  A - garbage
 ; OUT - BC - garbage
 ; OUT - DE - garbage
 ; OUT - HL - garbage
@@ -360,7 +375,7 @@ menu_call_generator:
 
 
 menu_dummy_generator:
-    xor a                                 ; set Z flag
+    or 1                                  ; set NZ flag
 menu_dummy_callback:
     ret                                   ;
 

@@ -20,8 +20,10 @@ var_current_menu DB 0
 var_current_menu_ptr WORD main_menu
 
 var_player_state player_state_t
-var_player_nextfile_flag BYTE 0
-var_player_prevfile_flag BYTE 0
+
+PLAYLIST_NEXT equ 1
+PLAYLIST_PREV equ 2
+var_playlist_flag BYTE 0
 
 var_smf_file smf_file_t
 

@@ -4,7 +4,7 @@ INPUT_BEEP_DELAY        equ 20
 
 PIANO_KEYS_FIRST        equ 12
 
-LOAD_NEXT_FILE_DELAY    equ 10
+PLAYLIST_DELAY          equ 10
 
 SMF_MAX_TRACKS          equ 60
 

@@ -47,6 +47,7 @@ player_driver_flush_txbuf:
 
 player_loop:
     xor a                                     ;
+    out (#fe), a                              ;
     ld (var_player_state.flags), a            ;
     ld (var_player_state.last_int_counter), a ;
     ld (var_player_state.subseconds_l), a     ;
@@ -114,16 +115,16 @@ player_loop:
     jr .process_tracks             ; ...
 1:  ld a, (var_input_key)          ;
     cp INPUT_KEY_BACK              ;
-    jr z, .end                     ;
+    jr z, .playlist_stop            ;
     cp INPUT_KEY_ACT               ;
-    jr z, .load_next_file          ;
+    jr z, .playlist_next           ;
     cp INPUT_KEY_DOWN              ;
-    jr z, .load_next_file          ;
+    jr z, .playlist_next           ;
     cp INPUT_KEY_UP                ;
-    jr z, .load_prev_file          ;
+    jr z, .playlist_prev           ;
 .process_tracks:
     call smf_get_first_track       ;
-    jr z, .load_next_file          ;
+    jr z, .playlist_next           ;
 .process_current_track:
     call smf_process_track         ; A = status, HL = track position, BC = data len
     jp c, .next_track              ; if C == 1 (delayed) then go to the next track
@@ -151,13 +152,15 @@ player_loop:
     jp nz, .process_current_track  ;
     call smf_next_int              ;
     jp .loop                       ;
-.load_prev_file:
-    ld a, 1                          ;
-    ld (var_player_prevfile_flag), a ;
-    jr .end                          ;
-.load_next_file:
-    ld a, 1                          ;
-    ld (var_player_nextfile_flag), a ;
+.playlist_prev:
+    ld a, PLAYLIST_PREV            ;
+    jr 1f                          ;
+.playlist_next:
+    ld a, PLAYLIST_NEXT            ;
+    jr 1f                          ;
+.playlist_stop:
+    xor a                          ;
+1:  ld (var_playlist_flag), a      ;
 .end:
     call player_driver_flush_txbuf   ;
     ; call player_reset_chip           ;

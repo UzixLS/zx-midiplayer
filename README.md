@@ -28,5 +28,4 @@ You may use addon with builtin MIDI synthesizer or connect an external one to yo
 - Implement DivIDE, NemoIDE, SMUC support
 - Support for >64Kb files
 - Add scrollbars or entries counter to menus
-- Handle last entry in playlist
 - Restore previous menu position when going into parent directory ".."

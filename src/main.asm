@@ -84,11 +84,24 @@ main:
     ei : halt                       ;
     call input_process              ;
     ld a, (var_input_key)           ;
-    cp INPUT_KEY_BACK               ;
-    call z, menu_main_right_toggle  ;
-    ld iy, (var_current_menu_ptr)   ;
+    cp INPUT_KEY_BACK               ; if back key is pressed and playlist active - stop playlist
+    jr nz, 2f                       ; ...
+    ld a, (var_playlist_flag)       ; ...
+    or a                            ; ...
+    jr z, 1f                        ; ...
+    xor a                           ; ...
+    ld (var_playlist_flag), a       ; ...
+    jr .loop                        ; ...
+1:  call menu_main_right_toggle     ; else - switch menu
+2:  ld iy, (var_current_menu_ptr)   ;
     call menu_handle_input          ;
-    jp .loop                        ;
+    ld a, (var_playlist_flag)       ;
+    cp PLAYLIST_NEXT                ;
+    call z, playlist_next           ;
+    ld a, (var_playlist_flag)       ;
+    cp PLAYLIST_PREV                ;
+    call z, playlist_prev           ;
+    jr .loop                        ;
 
 
 exit:
@@ -188,36 +201,38 @@ play_file:
 1:  call screen_select_player        ;
     call player_loop                 ;
     call screen_select_menu          ;
-    ld a, (var_player_prevfile_flag) ; if prev flag is set - load prev file
-    dec a                            ; ...
-    jr z, .load_prev_file            ; ...
-    ld a, (var_player_nextfile_flag) ; if nextfile flag is set - load next file
-    dec a                            ; ...
-    ret nz                           ; ... or exit if isn't set
-.load_next_file:
+    ret                              ;
+
+
+playlist_next:
     ld iy, right_menu                ;
-    ld (var_player_nextfile_flag), a ; reset nextfile flag
-    ld b, LOAD_NEXT_FILE_DELAY       ; just cosmetic delay
+    ld b, PLAYLIST_DELAY             ; just cosmetic delay
 1:  ei : halt                        ; ...
     djnz 1b                          ; ...
     ld a, INPUT_KEY_DOWN             ; move cursor down
     call input_simulate_keypress     ; ...
     call menu_handle_input           ; ...
-    ld b, LOAD_NEXT_FILE_DELAY       ; just cosmetic delay
+    jr nz, .no_more_entries          ;
+    ld b, PLAYLIST_DELAY             ; just cosmetic delay
 1:  ei : halt                        ; ...
     djnz 1b                          ; ...
     ld a, INPUT_KEY_ACT              ; load file
     call input_simulate_keypress     ; ...
     jp menu_handle_input             ; ...
-.load_prev_file:
-    ld (var_player_prevfile_flag), a ; reset prevfile flag
-    ld b, LOAD_NEXT_FILE_DELAY       ; just cosmetic delay
+.no_more_entries:
+    xor a                            ;
+    ld (var_playlist_flag), a        ;
+    ret                              ;
+
+playlist_prev:
+    ld b, PLAYLIST_DELAY             ; just cosmetic delay
 1:  ei : halt                        ; ...
     djnz 1b                          ; ...
     ld a, INPUT_KEY_UP               ; move cursor up
     call input_simulate_keypress     ; ...
     call menu_handle_input           ; ...
-    ld b, LOAD_NEXT_FILE_DELAY       ; just cosmetic delay
+    jr nz, playlist_next.no_more_entries ;
+    ld b, PLAYLIST_DELAY             ; just cosmetic delay
 1:  ei : halt                        ; ...
     djnz 1b                          ; ...
     ld a, INPUT_KEY_ACT              ; load file
