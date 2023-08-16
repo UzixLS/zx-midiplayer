@@ -191,6 +191,17 @@ menu_main_right_set_style:
     jp menu_style_active          ;
 
 
+right_menu_clear:
+    ld iy, right_menu                                         ;
+    ld (iy+menu_t.generator_fun+0), low  menu_dummy_generator ;
+    ld (iy+menu_t.generator_fun+1), high menu_dummy_generator ;
+    ld (iy+menu_t.context+0),       low  menu_dummy_callback  ;
+    ld (iy+menu_t.context+1),       high menu_dummy_callback  ;
+    call menu_init                                            ;
+    call menu_draw                                            ;
+    jp menu_style_inactive                                    ;
+
+
 play_file:
     ld ix, file_base_addr            ;
     call smf_parse                   ;
@@ -295,8 +306,10 @@ main_menu_callback:
     jr c, .static_menu_entry                                           ; ...
 .disk_menu_entry:
     call disk_change                                                   ;
+    jr nz, .err                                                        ;
     ld de, #ffff                                                       ;
     call disk_directory_load                                           ;
+    jr nz, .err                                                        ;
     push af                                                            ;
     ld iy, right_menu                                                  ;
     ld (iy+menu_t.generator_fun+0), low  disk_directory_menu_generator ;
@@ -310,6 +323,10 @@ main_menu_callback:
     ld a, LAYOYT_ERR_FE                                                ;
     out (#fe), a                                                       ;
     jp menu_style_inactive                                             ;
+.err:
+    ld a, LAYOYT_ERR_FE                                                ;
+    out (#fe), a                                                       ;
+    jp right_menu_clear                                                ;
 .static_menu_entry:
     neg                                                                ;
     ld e, a                                                            ;

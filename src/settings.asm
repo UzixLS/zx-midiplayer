@@ -93,13 +93,7 @@ settings_apply:
 
 settings_menu_ok_cb:
     call settings_apply                                       ;
-    ld iy, right_menu                                         ;
-    ld (iy+menu_t.generator_fun+0), low  menu_dummy_generator ;
-    ld (iy+menu_t.generator_fun+1), high menu_dummy_generator ;
-    ld (iy+menu_t.context+0),       low  menu_dummy_callback  ;
-    ld (iy+menu_t.context+1),       high menu_dummy_callback  ;
-    call menu_init                                            ;
-    call menu_draw                                            ;
+    call right_menu_clear                                     ;
     ld iy, main_menu                                          ;
     call menu_draw                                            ;
     jp menu_main_right_toggle                                 ;

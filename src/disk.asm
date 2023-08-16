@@ -345,6 +345,7 @@ disk_change:
     ld (disk_directory_menu_generator+1), hl ;
     ld hl, 0                                 ;
     ld (var_disks.current_ptr), hl           ;
+    xor a                                    ; set Z flag
     ret                                      ;
 .fat:
     ld hl, fatfs_entry_is_directory          ;
