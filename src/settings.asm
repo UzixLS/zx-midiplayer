@@ -6,6 +6,9 @@ output      DB
 divmmc      DB
 zxmmc       DB
 zcontroller DB
+divide      DB
+nemoide     DB
+smuc        DB
 extraram    DB
 _reserv     BLOCK 256-8, 0
     ENDS
@@ -167,6 +170,21 @@ settings_menuentry_zcontroller:
     DW var_settings.zcontroller
     DW str_off.end
     DW str_on.end
+settings_menuentry_divide:
+    DB 2
+    DW var_settings.divide
+    DW str_off.end
+    DW str_on.end
+settings_menuentry_nemoide:
+    DB 2
+    DW var_settings.nemoide
+    DW str_off.end
+    DW str_on.end
+settings_menuentry_smuc:
+    DB 2
+    DW var_settings.smuc
+    DW str_off.end
+    DW str_on.end
 settings_menuentry_extraram:
     DB 4
     DW var_settings.extraram
@@ -176,11 +194,14 @@ settings_menuentry_extraram:
     DW str_profi.end
 
 settings_menu_entries:
-    menugen_t 7
+    menugen_t 10
     menugen_entry_t str_output       settings_menu_val_cb settings_menu_cb settings_menuentry_output
     menugen_entry_t str_divmmc       settings_menu_val_cb settings_menu_cb settings_menuentry_divmmc
     menugen_entry_t str_zxmmc        settings_menu_val_cb settings_menu_cb settings_menuentry_zxmmc
     menugen_entry_t str_zcontroller  settings_menu_val_cb settings_menu_cb settings_menuentry_zcontroller
+    menugen_entry_t str_divide       settings_menu_val_cb settings_menu_cb settings_menuentry_divide
+    menugen_entry_t str_nemoide      settings_menu_val_cb settings_menu_cb settings_menuentry_nemoide
+    menugen_entry_t str_smuc         settings_menu_val_cb settings_menu_cb settings_menuentry_smuc
     menugen_entry_t str_extraram     settings_menu_val_cb settings_menu_cb settings_menuentry_extraram
     menugen_entry_t str_save         0 settings_menu_save_cb
     menugen_entry_t str_ok           0 settings_menu_ok_cb

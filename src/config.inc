@@ -11,4 +11,7 @@ SMF_MAX_TRACKS          equ 60
 MMC_INIT_TIMEOUT        equ 4000/20
 MMC_READ_TIMEOUT        equ 4000/20
 
+IDE_INIT_TIMEOUT        equ 500/20
+IDE_READ_TIMEOUT        equ 4000/20
+
 DISKS_MAX_COUNT         equ 10

@@ -393,7 +393,6 @@ trdos_init:
 .trdos_ok:
     ld a, (trdos_var_current_drive) ;
     ld (var_disks.boot_n), a        ;
-    ld (var_disks.current_n), a     ;
     ret                             ;
 .no_trdos:
     ld hl, trdos_exec_fun           ; if there is no trdos - stub trdos_exec_fun()
@@ -401,3 +400,25 @@ trdos_init:
     ld (hl), #01 : inc hl           ; ...
     ld (hl), #c9                    ; ... ret
     ret                             ;
+
+
+
+; IN -  A  - port value
+; IN  - BC - port number
+; OUT - HL - garbage
+trdos_out:
+    ld hl, #3ff0                    ; "out (c), a : ret" code in trdos rom (scorpion only!)
+    jr trdos_in.c                   ;
+
+; IN  - BC - port number
+; OUT - A  - port value
+; OUT - HL - garbage
+trdos_in:                           ;
+    ld hl, #3ff3                    ; "in a, (c) : ret" code in trdos rom (scorpion only!)
+.c: call .sub                       ;
+    ei                              ;
+    ret                             ;
+.sub:                               ;
+    push hl                         ;
+    di                              ;
+    jp trdos_entrypoint_jump        ;

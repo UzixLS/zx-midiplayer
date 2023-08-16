@@ -46,6 +46,7 @@ int_im2_vector_table:
     include "fatfs.asm"
     include "disk.asm"
     include "trdos.asm"
+    include "ide.asm"
     include "mmc.asm"
     include "settings.asm"
     include "uart.asm"

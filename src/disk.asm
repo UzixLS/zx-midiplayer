@@ -59,10 +59,13 @@ disk_sector_size equ 512
 DISK_DRIVER_DIVMMC      equ #10
 DISK_DRIVER_ZXMMC       equ #20
 DISK_DRIVER_ZCONTROLLER equ #30
+DISK_DRIVER_DIVIDE      equ #40 | #80
+DISK_DRIVER_NEMOIDE     equ #50 | #80
+DISK_DRIVER_SMUC        equ #60 | #80
     STRUCT disk_t
 driver         DB
 offset         DD
-mmc_type       DB
+disk_param     DB
 fatfs          fatfs_disk_t
 _reserv        BLOCK 1, 0
     ENDS
@@ -188,10 +191,32 @@ disks_scan_mmc:
     call mmc_init                      ;
     ret nz                             ;
     ld a, e                            ;
-    ld (var_disk.mmc_type), a          ;
+    ld (var_disk.disk_param), a        ;
     call disks_scan_filesystems        ;
     xor a : or ixh                     ; if there is no filesystems on disk - add it anyway, but deny any access to it
     ret nz                             ;
+    ld a, #01                          ; ...
+    ld (var_disk.driver), a            ; ...
+    jp disks_save_new                  ; ...
+
+
+; IN  -  A - driver | disk_number
+; OUT - AF - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
+; OUT - IX - garbage
+disks_scan_ide:
+    ld (var_disk.driver), a            ;
+    call ide_driver_select             ;
+    call ide_init                      ;
+    ld a, 0                            ; nemoide may affect #fe port
+    out (#fe), a                       ; ...
+    ret nz                             ;
+    call disks_scan_filesystems        ;
+    xor a : or ixh                     ; if there is no filesystems on disk - add it anyway, but deny any access to it
+    ret nz                             ;
+    ld a, #81                          ; ...
     ld (var_disk.driver), a            ; ...
     jp disks_save_new                  ; ...
 
@@ -231,13 +256,37 @@ disks_init:
 .scan_zcontroller:
     ld a, (var_settings.zcontroller)   ;
     or a                               ;
-    ret z                              ;
+    jr z, .scan_divide                 ;
     ld a, DISK_DRIVER_ZCONTROLLER      ;
-    jp disks_scan_mmc                  ;
+    call disks_scan_mmc                ;
+.scan_divide:
+    ld a, (var_settings.divide)        ;
+    or a                               ;
+    jr z, .scan_nemoide                ;
+    ld a, DISK_DRIVER_DIVIDE | #00     ;
+    call disks_scan_ide                ;
+    ld a, DISK_DRIVER_DIVIDE | #01     ;
+    call disks_scan_ide                ;
+.scan_nemoide:
+    ld a, (var_settings.nemoide)       ;
+    or a                               ;
+    jr z, .scan_smuc                   ;
+    ld a, DISK_DRIVER_NEMOIDE | #00    ;
+    call disks_scan_ide                ;
+    ld a, DISK_DRIVER_NEMOIDE | #01    ;
+    call disks_scan_ide                ;
+.scan_smuc:
+    ld a, (var_settings.smuc)          ;
+    or a                               ;
+    ret z                              ;
+    ld a, DISK_DRIVER_SMUC | #00       ;
+    call disks_scan_ide                ;
+    ld a, DISK_DRIVER_SMUC | #01       ;
+    jp disks_scan_ide                  ;
 
 
 ; IN  - DEBC - src lba
-; IN  - HL   - dst address of A*512-byte buffer
+; IN  - HL   - dst address of IXL*512-byte buffer
 ; IN  - IXL  - sectors count
 ; OUT - F    - Z on success, NZ on fail
 ; OUT - HL   - next untouched dst address
@@ -252,13 +301,14 @@ disk_read_sectors:
     ld b, h : ld c, l                ; ...
     ld hl, (var_disk.offset+2)       ; ...
     adc hl, de                       ; ...
-    ld d, h : ld e, l                ; ...
+    ex de, hl                        ; ...
     pop hl                           ;
 .loop:
     push de                          ;
     push bc                          ;
-    ld a, (var_disk.mmc_type)        ;
-    call mmc_read_block              ;
+    push ix                          ;
+    call .driver_read_block          ;
+    pop ix                           ;
     pop bc                           ;
     pop de                           ;
     ret nz                           ;
@@ -269,6 +319,12 @@ disk_read_sectors:
 1:  dec ixl                          ;
     jr nz, .loop                     ;
     ret                              ;
+.driver_read_block:
+    ld a, (var_disk.driver)          ; if 7th bit is set - ide driver, else mmc
+    bit 7, a                         ; ...
+    ld a, (var_disk.disk_param)      ;
+    jp nz, ide_read_block            ;
+    jp mmc_read_block                ;
 
 
 ; IN  - DE - entry number
@@ -328,12 +384,31 @@ disk_change:
     pop de                                   ;
     ld a, e                                  ;
     ld (var_disks.current_n), a              ;
-    ld a, (var_trdos_present)                ;
-    or a                                     ;
-    jr z, .fat                               ;
-    ld a, e                                  ;
-    cp trdos_disks                           ;
-    jr nc, .fat                              ;
+    ld h, 0 : ld l, e                        ; hl = &disks[count*32]
+    assert disk_t == 16
+    .4 add hl, hl                            ; ...
+    ld de, var_disks.all                     ; ...
+    add hl, de                               ; ...
+    ld (var_disks.current_ptr), hl           ;
+    ld de, var_disk                          ; memcpy(var_disk,&disks[count*32],sizeof(disk_t))
+    ld bc, disk_t                            ; ...
+    ldir                                     ; ...
+    ld a, (var_disk.driver)                  ; determine driver type
+    or a                                     ; ...
+    jr z, .trd                               ; ...
+.fat:
+    ld hl, fatfs_entry_is_directory          ;
+    ld (disk_entry_is_directory+1), hl       ;
+    ld hl, fatfs_file_load                   ;
+    ld (disk_file_load+1), hl                ;
+    ld hl, fatfs_directory_load              ;
+    ld (disk_directory_load+1), hl           ;
+    ld hl, fatfs_file_menu_generator         ;
+    ld (disk_directory_menu_generator+1), hl ;
+.ide:
+    jp m, ide_driver_select                  ; ... check bit 7
+.mmc:
+    jp mmc_driver_select                     ; ...
 .trd:
     ld hl, trdos_entry_is_directory          ;
     ld (disk_entry_is_directory+1), hl       ;
@@ -347,28 +422,7 @@ disk_change:
     ld (var_disks.current_ptr), hl           ;
     xor a                                    ; set Z flag
     ret                                      ;
-.fat:
-    ld hl, fatfs_entry_is_directory          ;
-    ld (disk_entry_is_directory+1), hl       ;
-    ld hl, fatfs_file_load                   ;
-    ld (disk_file_load+1), hl                ;
-    ld hl, fatfs_directory_load              ;
-    ld (disk_directory_load+1), hl           ;
-    ld hl, fatfs_file_menu_generator         ;
-    ld (disk_directory_menu_generator+1), hl ;
-.fat_set_new_cur_disk:
-    ld h, 0 : ld l, e                        ; hl = &disks[count*32]
-    assert disk_t == 16
-    .4 add hl, hl                            ; ...
-    ld de, var_disks.all                     ; ...
-    add hl, de                               ; ...
-    ld (var_disks.current_ptr), hl           ;
-    ld de, var_disk                          ; memcpy(var_disk,&disks[count*32],sizeof(disk_t))
-    ld bc, disk_t                            ; ...
-    ldir                                     ; ...
-.fat_setup_lower_driver:
-    ld a, (var_disk.driver)                  ;
-    jp mmc_driver_select                     ;
+
 
 
 ; IN  - HL - pointer to file extension
@@ -410,6 +464,8 @@ disks_get_icon_by_extension:
 ; OUT -  F - Z on success, NZ on fail
 ; OUT - IX - pointer to 0-terminated string
 ; OUT -  A - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
 disks_menu_generator:
     ld ix, tmp_menu_string              ;
     ld a, 'A'                           ;
@@ -417,19 +473,25 @@ disks_menu_generator:
     ld (ix+1), a                        ;
     ld (ix+2), ':'                      ;
     ld (ix+3), 0                        ;
-.check_type:
-    ld a, e                             ;
-    ld (var_disks.current_n), a         ;
-    ld a, (var_trdos_present)           ;
-    or a                                ;
-    jr z, .fat                          ;
-    ld a, e                             ;
-    cp trdos_disks                      ;
-    jr nc, .fat                         ;
+.icon:
+    assert disk_t == 16
+    ld h, 0 : ld l, e                   ; de = &disks[count]
+    .4 add hl, hl                       ; ...
+    ld de, var_disks.all                ; ...
+    add hl, de                          ; ...
+    ld a, (hl)                          ; determine driver type
+    or a                                ; ...
+    jr z, .trd                          ; ...
+    jp m, .ide                          ; ...
+.mmc:
+    ld (ix+0), udg_mmc                  ;
+    xor a                               ; set Z flag
+    ret                                 ;
+.ide:
+    ld (ix+0), udg_ide                  ;
+    xor a                               ; set Z flag
+    ret                                 ;
 .trd:
     ld (ix+0), udg_floppy               ;
-    jr 1f                               ;
-.fat:
-    ld (ix+0), udg_mmc                  ;
-1:  xor a                               ; set Z flag
+    xor a                               ; set Z flag
     ret                                 ;
