@@ -8,19 +8,20 @@ screen_help_ptr equ #C006
     export screens_page
 
 
-; IN  - DE - pointer to pointer to rle-packed screen data
+; IN  - HL - pointer to pointer to rle-packed screen data
 ; OUT - AF - garbage
 ; OUT - BC - garbage
 ; OUT - DE - garbage
 ; OUT - HL - garbage
-; OUT - IX - garbage
 screen_load:
     ld a, #10 + screens_page                  ;
     ld bc, #7ffd                              ;
     out (c), a                                ;
-    ld h, (ix+1)                              ;
-    ld l, (ix+0)                              ;
-    ld de, #4000                              ;
+    ld e, (hl)                                ; src
+    inc hl                                    ; ...
+    ld d, (hl)                                ; ...
+    ld hl, #4000                              ; dst
+    ex de, hl                                 ;
     call rle_unpack                           ;
     ld a, #10                                 ;
     ld bc, #7ffd                              ;
@@ -38,7 +39,7 @@ screen_select_menu:
     ld hl, .load                              ;
     ld (var_current_screen), hl               ;
 .load:
-    ld ix, screen_menu_ptr                    ;
+    ld hl, screen_menu_ptr                    ;
     call screen_load                          ;
 .print:
     LD_SCREEN_ADDRESS hl, LAYOUT_HEAD         ;
@@ -67,8 +68,7 @@ screen_select_menu:
     call menu_draw                            ;
     ld iy, right_menu                         ;
     call menu_draw                            ;
-    call menu_main_right_set_style            ;
-    ret                                       ;
+    jp menu_main_right_set_style              ;
 
 
 ; OUT - AF - garbage
@@ -80,7 +80,7 @@ screen_select_player:
     ld hl, .load                              ;
     ld (var_current_screen), hl               ;
 .load:
-    ld ix, screen_play_ptr                    ;
+    ld hl, screen_play_ptr                    ;
     call screen_load                          ;
 .print:
     LD_SCREEN_ADDRESS hl, LAYOUT_HEAD         ;
@@ -95,7 +95,18 @@ screen_select_player:
     LD_SCREEN_ADDRESS hl, LAYOUT_TIMER        ;
     ld ix, str_zerotimer                      ;
     call print_string0                        ;
-    ret                                       ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_SIZE         ;
+    ld a, '$'                                 ;
+    call print_char                           ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_TRACKS       ;
+    ld a, '$'                                 ;
+    call print_char                           ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_TEMPO        ;
+    ld a, '$'                                 ;
+    call print_char                           ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_PPQN         ;
+    ld a, '$'                                 ;
+    jp print_char                             ;
 
 
 ; OUT - AF - garbage
@@ -107,12 +118,11 @@ screen_select_help:
     ld hl, .load                              ;
     ld (var_current_screen), hl               ;
 .load:
-    ld ix, screen_help_ptr                    ;
+    ld hl, screen_help_ptr                    ;
     call screen_load                          ;
     LD_SCREEN_ADDRESS hl, LAYOUT_HEAD         ;
     ld ix, str_head                           ;
-    call print_string0                        ;
-    ret                                       ;
+    jp print_string0                          ;
 
 
 ; OUT - AF - garbage
