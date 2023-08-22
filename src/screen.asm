@@ -95,16 +95,16 @@ screen_select_player:
     LD_SCREEN_ADDRESS hl, LAYOUT_TIMER        ;
     ld ix, str_zerotimer                      ;
     call print_string0                        ;
-    LD_SCREEN_ADDRESS hl, LAYOUT_SIZE         ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_SIZE-1       ;
     ld a, '$'                                 ;
     call print_char                           ;
-    LD_SCREEN_ADDRESS hl, LAYOUT_TRACKS       ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_TRACKS-1     ;
     ld a, '$'                                 ;
     call print_char                           ;
-    LD_SCREEN_ADDRESS hl, LAYOUT_TEMPO        ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_TEMPO-1      ;
     ld a, '$'                                 ;
     call print_char                           ;
-    LD_SCREEN_ADDRESS hl, LAYOUT_PPQN         ;
+    LD_SCREEN_ADDRESS hl, LAYOUT_PPQN-1       ;
     ld a, '$'                                 ;
     jp print_char                             ;
 
