@@ -51,9 +51,9 @@ mmc_driver_select:
 .zcontroller:
     bit 0, b                      ;
     ret nz                        ; only one card
-    ld a, #fd                     ; 1st card
+    ld a, #01                     ; 1st card
     ld (mmcdrv_cs_on.V+1), a      ;
-    ld a, #ff                     ; cs off
+    ld a, #03                     ; cs off
     ld (mmcdrv_cs_off.V+1), a     ;
     ld a, #77                     ; control port
     ld (mmcdrv_cs_on.P+1), a      ;
@@ -75,10 +75,10 @@ mmcdrv_cs_off:
 .P  out (#ff), a ;
     ret          ;
 mmcdrv_tx:
-.P  out (0), a   ;
+.P  out (#ff), a ;
     ret          ;
 mmcdrv_rx:
-.P  in a, (0)    ;
+.P  in a, (#ff)  ;
     ret          ;
 
 
@@ -364,9 +364,9 @@ mmc_read_block:
     inir                               ;
     .2 in a, (c)                       ; crc
 .exit:
-    xor a                              ;
+    xor a                              ; set Z flag
     jp mmcdrv_cs_off                   ;
 .err:
-    or a                               ;
+    or 1                               ; set NZ flag
     jp mmcdrv_cs_off                   ;
 .cmd17: DB #51,#00,#00,#00,#00,#ff
