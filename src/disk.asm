@@ -117,7 +117,6 @@ disks_scan_filesystems:
     ld hl, disk_buffer                 ;
     ld ixl, 1                          ;
     call disk_read_sectors             ;
-    ld a, 0                            ;
     ret nz                             ;
 .fatfs_without_mbr:
     call fatfs_init.check              ; disk may be formatted to fat without mbr
@@ -168,7 +167,7 @@ disks_scan_filesystems:
     or (hl)                            ; ...
     ret z                              ; ...
     pop ix                             ; return address
-1:  ld h, d : ld l, e                  ; save PT_LbaOfs
+1:  ex de, hl                          ; save PT_LbaOfs
     ld e, (hl) : inc hl                ; ...
     ld d, (hl) : inc hl                ; ...
     push de                            ; ...
@@ -237,28 +236,6 @@ disks_init:
     jr z, .scan_divmmc                 ;
     ld a, trdos_disks                  ;
     ld (var_disks.count), a            ;
-.scan_divmmc:
-    ld a, (var_settings.divmmc)        ;
-    or a                               ;
-    jr z, .scan_zxmmc                  ;
-    ld a, DISK_DRIVER_DIVMMC | #00     ;
-    call disks_scan_mmc                ;
-    ld a, DISK_DRIVER_DIVMMC | #01     ;
-    call disks_scan_mmc                ;
-.scan_zxmmc:
-    ld a, (var_settings.zxmmc)         ;
-    or a                               ;
-    jr z, .scan_zcontroller            ;
-    ld a, DISK_DRIVER_ZXMMC | #00      ;
-    call disks_scan_mmc                ;
-    ld a, DISK_DRIVER_ZXMMC | #01      ;
-    call disks_scan_mmc                ;
-.scan_zcontroller:
-    ld a, (var_settings.zcontroller)   ;
-    or a                               ;
-    jr z, .scan_divide                 ;
-    ld a, DISK_DRIVER_ZCONTROLLER      ;
-    call disks_scan_mmc                ;
 .scan_divide:
     ld a, (var_settings.divide)        ;
     or a                               ;
@@ -278,11 +255,33 @@ disks_init:
 .scan_smuc:
     ld a, (var_settings.smuc)          ;
     or a                               ;
-    ret z                              ;
+    jr z, .scan_divmmc                 ;
     ld a, DISK_DRIVER_SMUC | #00       ;
     call disks_scan_ide                ;
     ld a, DISK_DRIVER_SMUC | #01       ;
-    jp disks_scan_ide                  ;
+    call disks_scan_ide                ;
+.scan_divmmc:
+    ld a, (var_settings.divmmc)        ;
+    or a                               ;
+    jr z, .scan_zxmmc                  ;
+    ld a, DISK_DRIVER_DIVMMC | #00     ;
+    call disks_scan_mmc                ;
+    ld a, DISK_DRIVER_DIVMMC | #01     ;
+    call disks_scan_mmc                ;
+.scan_zxmmc:
+    ld a, (var_settings.zxmmc)         ;
+    or a                               ;
+    jr z, .scan_zcontroller            ;
+    ld a, DISK_DRIVER_ZXMMC | #00      ;
+    call disks_scan_mmc                ;
+    ld a, DISK_DRIVER_ZXMMC | #01      ;
+    call disks_scan_mmc                ;
+.scan_zcontroller:
+    ld a, (var_settings.zcontroller)   ;
+    or a                               ;
+    ret z                              ;
+    ld a, DISK_DRIVER_ZCONTROLLER      ;
+    jp disks_scan_mmc                  ;
 
 
 ; IN  - DEBC - src lba
