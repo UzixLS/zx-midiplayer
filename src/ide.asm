@@ -164,8 +164,7 @@ idedrv_nemoide_out_lbaex_drive_head:
     ret                                  ;
 idedrv_smuc_out_lbaex_drive_head:
     ld bc, #febe                         ; Ide_Reg_DriveHead
-    call trdos_out                       ;
-    ret                                  ;
+    jp trdos_out                         ;
 
 idedrv_divide_out_command:
     ld bc, #ffbf                         ; Ide_Reg_Command
@@ -177,8 +176,7 @@ idedrv_nemoide_out_command:
     ret                                  ;
 idedrv_smuc_out_command:
     ld bc, #ffbe                         ; Ide_Reg_Command
-    call trdos_out                       ;
-    ret                                  ;
+    jp trdos_out                         ;
 
 idedrv_divide_in_status:
     ld bc, #ffbf                         ; Ide_Reg_Status
@@ -190,8 +188,7 @@ idedrv_nemoide_in_status:
     ret                                  ;
 idedrv_smuc_in_status:
     ld bc, #ffbe                         ; Ide_Reg_Status
-    call trdos_in                        ;
-    ret                                  ;
+    jp trdos_in                          ;
 
 ; IN  - A    - sectors count
 ; IN  - EIX  - lba
