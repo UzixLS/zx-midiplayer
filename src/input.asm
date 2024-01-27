@@ -154,7 +154,7 @@ input_beep:
 ; OUT - AF - garbage
 ; OUT -  C - garbage
 input_process:
-.A: call input_read                   ; read keys. Self modifying code! see input_detect_kempston
+.A: call input_read                   ; read keys. Self modifying code! see input_init_kempston
     ld a, (var_input_key_last)        ;
     cp b                              ; if (current_pressed_key != last_pressed_key) {input_key = current_pressed_key; timer = X}
     jr nz, .new_key_event             ; ...
@@ -195,7 +195,12 @@ input_simulate_keypress:
 
 
 ; OUT - AF - garbage
-input_detect_kempston:
+input_init_kempston:
+    ld a, (var_settings.kempston)   ;
+    cp 1                            ; var_settings.kempston == 1 - auto
+    jr c, .no                       ; var_settings.kempston == 0 - off
+    jr nz, .yes                     ; var_settings.kempston == 2 - on
+.auto
     ei : halt                       ; avoid collision with attribute port
     ld a, #ff                       ; read kempston
     in a, (#1f)                     ; ...

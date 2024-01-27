@@ -2,6 +2,7 @@ settings_magic equ "zxmi"
 
     STRUCT settings_t
 magic       DD
+kempston    DB
 output      DB
 divmmc      DB
 zxmmc       DB
@@ -10,8 +11,9 @@ divide      DB
 nemoide     DB
 smuc        DB
 extraram    DB
-_reserv     BLOCK 256-8, 0
+_reserv     BLOCK 256-13, 0
     ENDS
+    assert settings_t == trdos_sector_size
 
 
 ; OUT -  F - Z on success, NZ on fail
@@ -90,11 +92,11 @@ settings_save:
 
 
 settings_apply:
+    call input_init_kempston                                  ;
     jp disks_init                                             ;
 
 
-
-settings_menu_ok_cb:
+settings_menu_apply_cb:
     call settings_apply                                       ;
     call right_menu_clear                                     ;
     ld iy, main_menu                                          ;
@@ -192,10 +194,17 @@ settings_menuentry_extraram:
     DW str_pentagon.end
     DW str_scorpion.end
     DW str_profi.end
+settings_menuentry_kempston:
+    DB 3
+    DW var_settings.kempston
+    DW str_off.end
+    DW str_auto.end
+    DW str_on.end
 
 settings_menu_entries:
-    menugen_t 9
+    menugen_t 10
     menugen_entry_t str_output       settings_menu_val_cb settings_menu_cb settings_menuentry_output
+    menugen_entry_t str_kempston     settings_menu_val_cb settings_menu_cb settings_menuentry_kempston
     menugen_entry_t str_divmmc       settings_menu_val_cb settings_menu_cb settings_menuentry_divmmc
     menugen_entry_t str_zxmmc        settings_menu_val_cb settings_menu_cb settings_menuentry_zxmmc
     menugen_entry_t str_zcontroller  settings_menu_val_cb settings_menu_cb settings_menuentry_zcontroller
@@ -204,4 +213,4 @@ settings_menu_entries:
     menugen_entry_t str_smuc         settings_menu_val_cb settings_menu_cb settings_menuentry_smuc
     ; menugen_entry_t str_extraram     settings_menu_val_cb settings_menu_cb settings_menuentry_extraram
     menugen_entry_t str_save         0 settings_menu_save_cb
-    menugen_entry_t str_ok           0 settings_menu_ok_cb
+    menugen_entry_t str_apply        0 settings_menu_apply_cb

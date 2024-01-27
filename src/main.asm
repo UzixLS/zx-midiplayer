@@ -69,9 +69,9 @@ main:
     out (c), a                      ; ...
     call device_detect_cpu_int      ;
     call uart_init                  ;
-    call input_detect_kempston      ;
     call trdos_init                 ;
     call settings_load              ;
+    call input_init_kempston        ;
     call disks_init                 ;
     ld iy, main_menu                ;
     call menu_init                  ;
