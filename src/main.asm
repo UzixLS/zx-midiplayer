@@ -68,9 +68,9 @@ main:
     ld bc, #7ffd                    ; ...
     out (c), a                      ; ...
     call device_detect_cpu_int      ;
-    call uart_init                  ;
     call trdos_init                 ;
     call settings_load              ;
+    call uart_init                  ;
     call input_init_kempston        ;
     call disks_init                 ;
     ld iy, main_menu                ;

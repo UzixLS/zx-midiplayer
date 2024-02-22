@@ -15,30 +15,24 @@ PLAYER_FLAG_FF        equ 1
 
 player_driver_select:
     ld a, (var_settings.output)          ;
-    cp 1                                 ;
+    cp 3                                 ;
     jr z, .shama2095                     ;
 .uart128:
-    ld hl, uart_prepare                  ;
-    ld (player_driver_prepare+1), hl     ;
     ld hl, uart_putc_txbuf               ;
     ld (player_driver_tx+1), hl          ;
     ld (player_loop.A+1), hl             ;
     ld (player_loop.B+1), hl             ;
     ld hl, uart_flush_txbuf              ;
     ld (player_driver_flush_txbuf+1), hl ;
-    ret                                  ;
+    jp uart_prepare                      ;
 .shama2095:
-    ld hl, shama2695_prepare             ;
-    ld (player_driver_prepare+1), hl     ;
     ld hl, shama2695_tx                  ;
     ld (player_driver_tx+1), hl          ;
     ld (player_loop.A+1), hl             ;
     ld (player_loop.B+1), hl             ;
     ld hl, shama2695_flush_txbuf         ;
     ld (player_driver_flush_txbuf+1), hl ;
-    ret                                  ;
-player_driver_prepare:
-    jp 0
+    jp shama2695_prepare                 ;
 player_driver_tx:
     jp 0
 player_driver_flush_txbuf:
@@ -61,7 +55,6 @@ player_loop:
     ld hl, 0                       ;
     call file_switch_page          ;
     call player_driver_select      ;
-    call player_driver_prepare     ;
     call player_reset_chip         ;
     call vis_init                  ;
     ld ix, var_current_file_name   ;

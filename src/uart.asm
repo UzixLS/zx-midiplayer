@@ -2,12 +2,6 @@
 ; OUT - BC - garbage
 ; OUT - HL - garbage
 uart_init:
-    ld bc, #fffd                     ;
-    ld a, #07                        ;
-    out (c), a                       ; Select register 7 - Mixer.
-    ld b, #bf                        ;
-    ld a, #fc                        ;
-    out (c), a                       ; Enable port A output.
     ld a, (var_device.cpu_freq)      ; if (cpu frequency != 3.5MHz) then patch code for it
     cp CPU_28_MHZ                    ;
     jp z, .patch_for_cpu_28mhz       ;
@@ -51,9 +45,23 @@ uart_init:
 
 
 uart_prepare:
-    xor a                             ;
-    ld (uart_txbuf_len), a            ;
-    ret                               ;
+    xor a                            ;
+    ld (uart_txbuf_len), a           ;
+.turbosound_chip_select:
+    ld bc, #fffd                     ;
+    ld a, (var_settings.output)      ; 0 - don't change, 1 - TS chip #1, 2 - TS chip #2
+    or a                             ;
+    jr z, .port_a_configure          ;
+    add #fe - 1                      ; #FF - select chip #1, #FE - select chip #2
+    xor 1                            ; ...
+    out (c), a                       ; ...
+.port_a_configure:
+    ld a, #07                        ; Select register 7 - Mixer.
+    out (c), a                       ; ...
+    ld b, #bf                        ;
+    ld a, #fc                        ; Enable port A output.
+    out (c), a                       ; ...
+    ret                              ;
 
 
 ; Send byte to MIDI device
