@@ -1,85 +1,168 @@
 ; IN  -  A - driver | card number
 ; OUT -  F - Z on success, NZ on fail
-; OUT - AF - garbage
-; OUT -  B - garbage
+; OUT -  F - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
 mmc_driver_select:
-    ld b, a                       ;
-    srl a                         ;
-    cp DISK_DRIVER_DIVMMC>>1      ;
-    jr z, .divmmc                 ;
-    cp DISK_DRIVER_ZXMMC>>1       ;
-    jr z, .zxmmc                  ;
-    cp DISK_DRIVER_ZCONTROLLER>>1 ;
-    jr z, .zcontroller            ;
-    ret                           ;
-.divmmc:
-    ld a, #fe                     ; 1st card
-    bit 0, b                      ;
-    jr z, 1f                      ;
-    ld a, #fd                     ; 2nd card
-1:  ld (mmcdrv_cs_on.V+1), a      ;
-    ld a, #ff                     ; cs off
-    ld (mmcdrv_cs_off.V+1), a     ;
-    ld a, #e7                     ; control port
-    ld (mmcdrv_cs_on.P+1), a      ;
-    ld (mmcdrv_cs_off.P+1), a     ;
-    ld a, #eb                     ; spi port
-    ld (mmcdrv_tx.P+1), a         ;
-    ld (mmcdrv_rx.P+1), a         ;
-    ld (mmc_cmd.P+1), a           ;
-    ld (mmc_read_block.P+1), a    ;
-    xor a                         ; set Z flag
-    ret                           ;
-.zxmmc:
-    ld a, #fe                     ; 1st card (0xfa)
-    bit 0, b                      ;
-    jr z, 1f                      ;
-    ld a, #f9                     ; 2nd card
-1:  ld (mmcdrv_cs_on.V+1), a      ;
-    ld a, #fb                     ; cs off
-    ld (mmcdrv_cs_off.V+1), a     ;
-    ld a, #1f                     ; control port
-    ld (mmcdrv_cs_on.P+1), a      ;
-    ld (mmcdrv_cs_off.P+1), a     ;
-    ld a, #3f                     ; spi port
-    ld (mmcdrv_tx.P+1), a         ;
-    ld (mmcdrv_rx.P+1), a         ;
-    ld (mmc_cmd.P+1), a           ;
-    ld (mmc_read_block.P+1), a    ;
-    xor a                         ; set Z flag
-    ret                           ;
-.zcontroller:
-    bit 0, b                      ;
-    ret nz                        ; only one card
-    ld a, #01                     ; 1st card
-    ld (mmcdrv_cs_on.V+1), a      ;
-    ld a, #03                     ; cs off
-    ld (mmcdrv_cs_off.V+1), a     ;
-    ld a, #77                     ; control port
-    ld (mmcdrv_cs_on.P+1), a      ;
-    ld (mmcdrv_cs_off.P+1), a     ;
-    ld a, #57                     ; spi port
-    ld (mmcdrv_tx.P+1), a         ;
-    ld (mmcdrv_rx.P+1), a         ;
-    ld (mmc_cmd.P+1), a           ;
-    ld (mmc_read_block.P+1), a    ;
-    xor a                         ; set Z flag
-    ret                           ;
+    cp DISK_DRIVER_DIVMMC | 0              ;
+    ld hl, mmcdrv_divmmc0                  ;
+    jr z, .setup                           ;
+    cp DISK_DRIVER_DIVMMC | 1              ;
+    ld hl, mmcdrv_divmmc1                  ;
+    jr z, .setup                           ;
+    cp DISK_DRIVER_ZXMMC | 0               ;
+    ld hl, mmcdrv_zxmmc0                   ;
+    jr z, .setup                           ;
+    cp DISK_DRIVER_ZXMMC | 1               ;
+    ld hl, mmcdrv_zxmmc1                   ;
+    jr z, .setup                           ;
+    cp DISK_DRIVER_ZCONTROLLER             ;
+    ld hl, mmcdrv_zcontroller              ;
+    jr z, .setup                           ;
+    cp DISK_DRIVER_NEOGS                   ;
+    ld hl, mmcdrv_neogs                    ;
+    jr z, .setup                           ;
+    ret                                    ;
+.setup:
+    ld de, mmcdrv_table                    ;
+    ld bc, mmcdrv_table_end - mmcdrv_table ;
+    ldir                                   ;
+    ret                                    ;
 
-mmcdrv_cs_on:
-.V  ld a, #ff    ;
-.P  out (#ff), a ;
+mmcdrv_table:
+mmcdrv_cs_on:       jp 0
+mmcdrv_cs_off:      jp 0
+mmcdrv_tx:          jp 0
+mmcdrv_rx:          jp 0
+mmcdrv_rxblock:     jp 0
+mmcdrv_table_end:
+
+mmcdrv_divmmc0:
+    jp mmcdrv_divmmc0_cs_on
+    jp mmcdrv_divmmc_cs_off
+    jp mmcdrv_divmmc_tx
+    jp mmcdrv_divmmc_rx
+    jp mmcdrv_divmmc_rxblock
+mmcdrv_divmmc1:
+    jp mmcdrv_divmmc1_cs_on
+    jp mmcdrv_divmmc_cs_off
+    jp mmcdrv_divmmc_tx
+    jp mmcdrv_divmmc_rx
+    jp mmcdrv_divmmc_rxblock
+mmcdrv_zxmmc0:
+    jp mmcdrv_zxmmc0_cs_on
+    jp mmcdrv_zxmmc_cs_off
+    jp mmcdrv_zxmmc_tx
+    jp mmcdrv_zxmmc_rx
+    jp mmcdrv_zxmmc_rxblock
+mmcdrv_zxmmc1:
+    jp mmcdrv_zxmmc1_cs_on
+    jp mmcdrv_zxmmc_cs_off
+    jp mmcdrv_zxmmc_tx
+    jp mmcdrv_zxmmc_rx
+    jp mmcdrv_zxmmc_rxblock
+mmcdrv_zcontroller:
+    jp mmcdrv_zcontroller_cs_on
+    jp mmcdrv_zcontroller_cs_off
+    jp mmcdrv_zcontroller_tx
+    jp mmcdrv_zcontroller_rx
+    jp mmcdrv_zcontroller_rxblock
+mmcdrv_neogs:
+    jp mmcdrv_neogs_cs_on
+    jp mmcdrv_neogs_cs_off
+    jp mmcdrv_neogs_tx
+    jp mmcdrv_neogs_rx
+    jp mmcdrv_neogs_rxblock
+
+mmcdrv_divmmc0_cs_on:
+    ld a, #fe    ;
+    out (#e7), a ;
     ret          ;
-mmcdrv_cs_off:
-.V  ld a, #ff    ;
-.P  out (#ff), a ;
+mmcdrv_divmmc1_cs_on:
+    ld a, #fd    ;
+    out (#e7), a ;
     ret          ;
-mmcdrv_tx:
-.P  out (#ff), a ;
+mmcdrv_divmmc_cs_off:
+    ld a, #ff    ;
+    out (#e7), a ;
     ret          ;
-mmcdrv_rx:
-.P  in a, (#ff)  ;
+mmcdrv_divmmc_tx:
+    out (#eb), a ;
     ret          ;
+mmcdrv_divmmc_rx:
+    in a, (#eb)  ;
+    ret          ;
+mmcdrv_divmmc_rxblock:
+    ld c, #eb    ;
+    inir         ;
+    ret          ;
+
+mmcdrv_zxmmc0_cs_on:
+    ld a, #fe    ; #fa
+    out (#1f), a ;
+    ret          ;
+mmcdrv_zxmmc1_cs_on:
+    ld a, #f9    ;
+    out (#1f), a ;
+    ret          ;
+mmcdrv_zxmmc_cs_off:
+    ld a, #fb    ;
+    out (#1f), a ;
+    ret          ;
+mmcdrv_zxmmc_tx:
+    out (#3f), a ;
+    ret          ;
+mmcdrv_zxmmc_rx:
+    in a, (#3f)  ;
+    ret          ;
+mmcdrv_zxmmc_rxblock:
+    ld c, #3f    ;
+    inir         ;
+    ret          ;
+
+mmcdrv_zcontroller_cs_on:
+    ld a, #01    ;
+    out (#77), a ;
+    ret          ;
+mmcdrv_zcontroller_cs_off:
+    ld a, #03    ;
+    out (#77), a ;
+    ret          ;
+mmcdrv_zcontroller_tx:
+    out (#57), a ;
+    ret          ;
+mmcdrv_zcontroller_rx:
+    in a, (#57)  ;
+    ret          ;
+mmcdrv_zcontroller_rxblock:
+    ld c, #57    ;
+    inir         ;
+    ret          ;
+
+mmcdrv_neogs_cs_on:
+    call neogs_reset_once   ;
+    ld a, M_SDNCS           ;
+    ld c, SCTRL             ;
+    jp neogs_out            ;
+mmcdrv_neogs_cs_off:
+    ld a, M_SDNCS|M_SETNCLR ;
+    ld c, SCTRL             ;
+    jp neogs_out            ;
+mmcdrv_neogs_tx:
+    ld c, SD_SEND           ;
+    jp neogs_out            ;
+mmcdrv_neogs_rx:
+    ld c, SD_RSTR           ;
+    jp neogs_in             ;
+mmcdrv_neogs_rxblock:
+    ld c, SD_RSTR           ;
+.loop:
+    call neogs_in           ;
+    ld (hl), a              ;
+    inc hl                  ;
+    djnz .loop              ;
+    ret                     ;
 
 
 CARDTYPE_NONE equ 0
@@ -155,9 +238,12 @@ mmc_cmd:
     call mmc_wait_not_busy             ;
     ld a, #ff                          ;
     ret nz                             ; zesarux fails there
-.P  ld c, #ff                          ;
     ld b, 6                            ;
-    otir                               ;
+.loop:
+    ld a, (hl)                         ;
+    inc hl                             ;
+    call mmcdrv_tx                     ;
+    djnz .loop                         ;
     ; jp mmc_wait_r1                     ;
 
 
@@ -358,11 +444,10 @@ mmc_read_block:
     jr z, .err                         ; ...
     djnz 1b                            ;
 .read_data:
-.P  ld c, #ff                          ;
-    ld b, 0                            ;
-    inir                               ;
-    inir                               ;
-    .2 in a, (c)                       ; crc
+    ld b, 0                            ; get 512 bytes
+    call mmcdrv_rxblock                ; ...
+    call mmcdrv_rxblock                ; ...
+    .2 call mmcdrv_rx                  ; crc
 .exit:
     xor a                              ; set Z flag
     jp mmcdrv_cs_off                   ;

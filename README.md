@@ -14,7 +14,7 @@ Quick demo video: https://www.youtube.com/watch?v=X_hX_dGmGeg
 * Support for up to 60 tracks in file (for heavier files, turbo CPU frequency is desirable);
 * Support for various CPU frequencies - 3.5MHz, 3.54MHz, 7MHz, 14MHz, 28MHz (no-waitstates required for turbo modes);
 * Support for BetaDisk/TR-DOS floppy interface (compatible with [ESXDOS](http://www.esxdos.org/index.html));
-* Support for SD card interfaces: DivMMC (and derivatives), ZXMMC, Z-Controller;
+* Support for SD card interfaces: DivMMC (and derivatives), ZXMMC, Z-Controller, NeoGS;
 * Support for IDE disk interfaces: DivIDE, NemoIDE, SMUC;
 * Support for FAT32 filesystem;
 * Hardware MIDI synthesizer required.

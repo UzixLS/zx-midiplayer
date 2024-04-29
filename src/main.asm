@@ -50,6 +50,7 @@ int_im2_vector_table:
     include "mmc.asm"
     include "settings.asm"
     include "uart.asm"
+    include "neogs.asm"
     include "shama2695.asm"
     include "smf.asm"
     include "player.asm"

@@ -59,9 +59,10 @@ disk_sector_size equ 512
 DISK_DRIVER_DIVMMC      equ #10
 DISK_DRIVER_ZXMMC       equ #20
 DISK_DRIVER_ZCONTROLLER equ #30
-DISK_DRIVER_DIVIDE      equ #40 | #80
-DISK_DRIVER_NEMOIDE     equ #50 | #80
-DISK_DRIVER_SMUC        equ #60 | #80
+DISK_DRIVER_NEOGS       equ #40
+DISK_DRIVER_DIVIDE      equ #50 | #80
+DISK_DRIVER_NEMOIDE     equ #60 | #80
+DISK_DRIVER_SMUC        equ #70 | #80
     STRUCT disk_t
 driver         DB
 offset         DD
@@ -279,8 +280,14 @@ disks_init:
 .scan_zcontroller:
     ld a, (var_settings.zcontroller)   ;
     or a                               ;
-    ret z                              ;
+    jr z, .scan_neogs                  ;
     ld a, DISK_DRIVER_ZCONTROLLER      ;
+    call disks_scan_mmc                ;
+.scan_neogs:
+    ld a, (var_settings.neogsmmc)      ;
+    or a                               ;
+    ret z                              ;
+    ld a, DISK_DRIVER_NEOGS            ;
     jp disks_scan_mmc                  ;
 
 

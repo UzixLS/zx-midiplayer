@@ -7,11 +7,12 @@ output      DB
 divmmc      DB
 zxmmc       DB
 zcontroller DB
+neogsmmc    DB
 divide      DB
 nemoide     DB
 smuc        DB
 extraram    DB
-_reserv     BLOCK 256-13, 0
+_reserv     BLOCK 256-14, 0
     ENDS
     assert settings_t == trdos_sector_size
 
@@ -174,6 +175,11 @@ settings_menuentry_zcontroller:
     DW var_settings.zcontroller
     DW str_off.end
     DW str_on.end
+settings_menuentry_neogsmmc:
+    DB 2
+    DW var_settings.neogsmmc
+    DW str_off.end
+    DW str_on.end
 settings_menuentry_divide:
     DB 2
     DW var_settings.divide
@@ -204,12 +210,13 @@ settings_menuentry_kempston:
     DW str_on.end
 
 settings_menu_entries:
-    menugen_t 10
+    menugen_t 11
     menugen_entry_t str_output       settings_menu_val_cb settings_menu_cb settings_menuentry_output
     menugen_entry_t str_kempston     settings_menu_val_cb settings_menu_cb settings_menuentry_kempston
     menugen_entry_t str_divmmc       settings_menu_val_cb settings_menu_cb settings_menuentry_divmmc
     menugen_entry_t str_zxmmc        settings_menu_val_cb settings_menu_cb settings_menuentry_zxmmc
     menugen_entry_t str_zcontroller  settings_menu_val_cb settings_menu_cb settings_menuentry_zcontroller
+    menugen_entry_t str_neogsmmc     settings_menu_val_cb settings_menu_cb settings_menuentry_neogsmmc
     menugen_entry_t str_divide       settings_menu_val_cb settings_menu_cb settings_menuentry_divide
     menugen_entry_t str_nemoide      settings_menu_val_cb settings_menu_cb settings_menuentry_nemoide
     menugen_entry_t str_smuc         settings_menu_val_cb settings_menu_cb settings_menuentry_smuc
