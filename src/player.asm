@@ -17,6 +17,8 @@ player_driver_select:
     ld a, (var_settings.output)          ;
     cp 3                                 ;
     jr z, .shama2095                     ;
+    cp 4                                 ;
+    jr z, .neogs                         ;
 .uart128:
     ld hl, uart_putc_txbuf               ;
     ld (player_driver_tx+1), hl          ;
@@ -33,6 +35,15 @@ player_driver_select:
     ld hl, shama2695_flush_txbuf         ;
     ld (player_driver_flush_txbuf+1), hl ;
     jp shama2695_prepare                 ;
+.neogs:
+    ld hl, neogs_vs1053_midi_tx          ;
+    ld (player_driver_tx+1), hl          ;
+    ld (player_loop.A+1), hl             ;
+    ld (player_loop.B+1), hl             ;
+    ld hl, neogs_vs1053_midi_flush_txbuf ;
+    ld (player_driver_flush_txbuf+1), hl ;
+    jp neogs_vs1053_midi_prepare         ;
+
 player_driver_tx:
     jp 0
 player_driver_flush_txbuf:

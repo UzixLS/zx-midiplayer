@@ -154,12 +154,13 @@ settings_menu_cb:
 
 
 settings_menuentry_output:
-    DB 4
+    DB 5
     DW var_settings.output
     DW str_128std.end
     DW str_ts1.end
     DW str_ts2.end
     DW str_shama.end
+    DW str_neogs1053.end
 settings_menuentry_divmmc:
     DB 2
     DW var_settings.divmmc
