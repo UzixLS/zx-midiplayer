@@ -4,43 +4,35 @@
 uart_init:
     ld a, (var_device.cpu_freq)      ; if (cpu frequency != 3.5MHz) then patch code for it
     cp CPU_28_MHZ                    ;
-    jp z, .patch_for_cpu_28mhz       ;
+    jr z, .patch_for_cpu_28mhz       ;
     cp CPU_14_MHZ                    ;
-    jp z, .patch_for_cpu_14mhz       ;
+    jr z, .patch_for_cpu_14mhz       ;
     cp CPU_7_MHZ                     ;
-    jp z, .patch_for_cpu_7mhz        ;
+    jr z, .patch_for_cpu_7mhz        ;
     cp CPU_3_54_MHZ                  ;
-    jp z, .patch_for_cpu_3_54mhz     ;
+    jr z, .patch_for_cpu_3_54mhz     ;
     ret                              ;
-
 .patch_for_cpu_3_54mhz:
-    xor a                            ; 0x00 = nop (4 T-states). Next byte at destination is 0x00 too.
+    xor a                            ; 0x00 = nop (4 T-states). Next byte at destination is 0x00 too
     ld (uart_putc.A), a              ; ... so we're replacing "ld a,0" (7) with "nop : nop" (8)
-    ld (uart_putc.B), a              ; ...
     ret                              ;
 .patch_for_cpu_7mhz:
     ld a, 12                         ; ld e, 12
-    ld (uart_putc.E+1), a            ;
-    ld a, 11                         ; ld a, 11
-    ld (uart_putc.C+1), a            ; ...
-    ld a, 9                          ; ld a, 9
-    ld (uart_putc.D+1), a            ; ...
+    ld (uart_putc.C+1), a            ;
+    ld a, 10                         ; ld a, 10
+    ld (uart_putc.B+1), a            ; ...
     ret                              ;
 .patch_for_cpu_14mhz:
     ld a, 24                         ; ld e, 24
-    ld (uart_putc.E+1), a            ;
-    ld a, 27                         ; ld a, 27
-    ld (uart_putc.C+1), a            ; ...
-    ld a, 25                         ; ld a, 25
-    ld (uart_putc.D+1), a            ; ...
+    ld (uart_putc.C+1), a            ;
+    ld a, 26                         ; ld a, 26
+    ld (uart_putc.B+1), a            ; ...
     ret                              ;
 .patch_for_cpu_28mhz:
     ld a, 48                         ; ld e, 48
-    ld (uart_putc.E+1), a            ;
-    ld a, 59                         ; ld a, 59
-    ld (uart_putc.C+1), a            ; ...
-    ld a, 57                         ; ld a, 57
-    ld (uart_putc.D+1), a            ; ...
+    ld (uart_putc.C+1), a            ;
+    ld a, 58                         ; ld a, 58
+    ld (uart_putc.B+1), a            ; ...
     ret                              ;
 
 
@@ -56,10 +48,10 @@ uart_prepare:
     xor 1                            ; ...
     out (c), a                       ; ...
 .port_a_configure:
-    ld a, #07                        ; Select register 7 - Mixer.
+    ld a, #07                        ; Select register 7 - Mixer
     out (c), a                       ; ...
     ld b, #bf                        ;
-    ld a, #fc                        ; Enable port A output.
+    ld a, #fc                        ; Enable port A output
     out (c), a                       ; ...
     ret                              ;
 
@@ -72,62 +64,35 @@ uart_prepare:
 ; OUT -  DE - garbage
 uart_putc:
     di                 ;
-    ld e, a            ; Store the byte to send.
+    ld e, a            ; Store the byte to send
     ld bc, #fffd       ;
     ld a, #0e          ;
-    out (c), a         ; Select register 14 - I/O port.
-
-.put_start_bit:
-    ld bc, #bffd       ;
-    ld a, #fa          ; Set RS232 'RXD' transmit line to 0. (Keep KEYPAD 'CTS' output line low to prevent the keypad resetting)
-    out (c), a         ; Send out the START bit.
-.delay_after_start_bit:
-.A: ld a, 0            ; (7) Introduce delays such that the next bit is output 112 T-states from now. Self modifying code! See uart_init.patch_for_cpu_3_54mhz
-    ld a, r            ; (9)
-.C: ld a, 3            ; (7) Self modifying code! See uart_init.patch_for_cpu_*. Patched for 112/224/448/896 T-states total
-1:  dec a              ; (4*3) or (4*11) or (4*27) or (4*59)
-    jp nz, 1b          ; (10*3) or (10*11) or (10*27) or (10*59)
-
-.send_bits:
-    ld a, e            ; (4) Retrieve the byte to send.
-    ld d, 8            ; (7) There are 8 bits to send.
+    out (c), a         ; Select register 14 - I/O port
+    ld b, #bf          ;
+    ld d, 1+8+1        ; There are START+DATA+STOP bits to send
+    scf                ; Put STOP bit into carry flag
+    jr .put_0          ; Send out the START bit
 .loop:
-    rra                ; (4) Rotate the next bit to send into the carry.
-    ld e, a            ; (4) Store the remaining bits.
-    jp nc, .put_0      ; (10) Jump if it is a 0 bit.
+    rr e               ; (8) Rotate the next bit to send into the carry
+    jp nc, .put_0      ; (10) Jump if it is a 0 bit
 .put_1:
     ld a, #fe          ; (7) Set RS232 'RXD' transmit line to 1. (Keep KEYPAD 'CTS' output line low to prevent the keypad resetting)
     out (c), a         ; (11)
-    jr .delay_next_bit ; (12) Jump forward to process the next bit.
+    jr .next_bit       ; (12) Jump forward to process the next bit
 .put_0:
     ld a, #fa          ; (7) Set RS232 'RXD' transmit line to 0. (Keep KEYPAD 'CTS' output line low to prevent the keypad resetting)
     out (c), a         ; (11)
-    jr .delay_next_bit ; (12) Jump forward to process the next bit.
-.delay_next_bit:
-.B: ld a, 0            ; (7) Introduce delays such that the next data bit is output 112 T-states from now. Self modifying code! See uart_init.patch_for_cpu_3_54mhz
-    nop                ; (4)
-    nop                ; (4)
-    nop                ; (4)
-    nop                ; (4)
-.D: ld a, 1            ; (7) Self modifying code! See uart_init.patch_for_cpu_*. Patched for 112/224/448/896 T-states total
-1:  dec a              ; (4*1) or (4*9) or (4*25) or (4*57)
-    jp nz, 1b          ; (10*1) or (10*9) or (10*25) or (10*57)
-.check_for_loop:
-    ld a, e            ; (4) Retrieve the remaining bits to send.
-    dec d              ; (4) Decrement the bit counter.
-    jr nz, .loop       ; (12/7) Jump back if there are further bits to send.
-
-.delay_before_stop_bit:
-    ld a, 0            ; (7) Introduce delays such that the stop bit is output 112 T-states from now.
-    nop                ; (4)
-    nop                ; (4)
-    nop                ; (4)
-    nop                ; (4)
-.put_stop_bit:
-    ld a, #fe          ; (7) Set RS232 'RXD' transmit line to 1. (Keep KEYPAD 'CTS' output line low to prevent the keypad resetting)
-    out (c), a         ; (11) Send out the STOP bit.
+    jr .next_bit       ; (12) Jump forward to process the next bit
+.next_bit:
+.A: ld a, 0            ; (7) Self modifying code! See uart_init.patch_for_cpu_3_54mhz. Patched for 113 T-states total
+.B: ld a, 2            ; (7) Self modifying code! See uart_init.patch_for_cpu_*. Patched for 112/224/448/896 T-states total
+1:  dec a              ; (4*2) or (4*10) or (4*26) or (4*58)
+    jp nz, 1b          ; (10*2) or (10*10) or (10*26) or (10*58)
+    .2 nop             ; (4*2)
+    dec d              ; (4) Decrement the bit counter
+    jp nz, .loop       ; (10) Jump back if there are further bits to send
 .delay_after_stop_bit:
-.E: ld e, 6            ; (7) Delay for 101 T-states (28.5us). Self modifying code! See uart_init.patch_for_cpu_*
+.C: ld e, 6            ; (7) Delay for 101 T-states (28.5us). Self modifying code! See uart_init.patch_for_cpu_*
 1:  dec e              ; (4)
     jr nz, 1b          ; (12/7)
     ei                 ;
