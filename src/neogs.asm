@@ -118,6 +118,8 @@ neogs_reset_once:
     ld (.A), a                                    ; ... ret
     ld a, C_GRST                                  ;
     out (GSCTR), a                                ;
+    ld c, #ff                                     ; not sure why this is required, but without this dummy out
+    call neogs_out                                ; ... midi doesn't play when "neogs mmc" option is disabled
     ret                                           ;
 
 
