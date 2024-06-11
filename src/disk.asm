@@ -84,6 +84,7 @@ all            BLOCK disk_t*DISKS_MAX_COUNT
 ; OUT -  AF - garbage
 ; OUT -  BC - garbage
 ; OUT -  DE - garbage
+; OUT -  HL - garbage
 disks_save_new:
     ld a, (var_disks.count)            ;
     cp DISKS_MAX_COUNT                 ;
@@ -91,12 +92,12 @@ disks_save_new:
     ld hl, var_disks.count             ; count_next++
     inc (hl)                           ; ...
     assert disk_t == 16
-    ld h, 0 : ld l, a                  ; de = &disks[count]
+    ld h, 0 : ld l, a                  ; de = &disks.all[count]
     .4 add hl, hl                      ; ...
     ld de, var_disks.all               ; ...
     add hl, de                         ; ...
     ex de, hl                          ; ...
-    ld hl, var_disk                    ; memcpy(&disks[count],var_disk,sizeof(disk_t))
+    ld hl, var_disk                    ; memcpy(&disks.all[count],var_disk,sizeof(disk_t))
     ld bc, disk_t                      ; ...
     ldir                               ; ...
     inc ixh                            ;
@@ -234,7 +235,7 @@ disks_init:
 .scan_trdos:
     ld a, (var_trdos_present)          ;
     or a                               ;
-    jr z, .scan_divmmc                 ;
+    jr z, .scan_divide                 ;
     ld a, trdos_disks                  ;
     ld (var_disks.count), a            ;
 .scan_divide:
@@ -383,20 +384,20 @@ disk_change:
     ld a, d                                  ;
     or e                                     ;
     jr z, .change_to_new_disk                ;
-    ld hl, var_disk                          ; memcpy(&disks[count],var_disk,sizeof(disk_t))
+    ld hl, var_disk                          ; memcpy(&disks.all[count],var_disk,sizeof(disk_t))
     ld bc, disk_t                            ;
     ldir                                     ;
 .change_to_new_disk:
     pop de                                   ;
     ld a, e                                  ;
     ld (var_disks.current_n), a              ;
-    ld h, 0 : ld l, e                        ; hl = &disks[count*32]
+    ld h, 0 : ld l, e                        ; hl = &disks.all[count]
     assert disk_t == 16
     .4 add hl, hl                            ; ...
     ld de, var_disks.all                     ; ...
     add hl, de                               ; ...
     ld (var_disks.current_ptr), hl           ;
-    ld de, var_disk                          ; memcpy(var_disk,&disks[count*32],sizeof(disk_t))
+    ld de, var_disk                          ; memcpy(var_disk,&disks.all[count],sizeof(disk_t))
     ld bc, disk_t                            ; ...
     ldir                                     ; ...
     ld a, (var_disk.driver)                  ; determine driver type
@@ -481,7 +482,7 @@ disks_menu_generator:
     ld (ix+3), 0                        ;
 .icon:
     assert disk_t == 16
-    ld h, 0 : ld l, e                   ; de = &disks[count]
+    ld h, 0 : ld l, e                   ; de = &disks.all[count]
     .4 add hl, hl                       ; ...
     ld de, var_disks.all                ; ...
     add hl, de                          ; ...
