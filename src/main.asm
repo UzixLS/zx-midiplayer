@@ -7,11 +7,31 @@
     include "config.inc"
     include "layout.inc"
 
+    ; make +3 and TR-DOS mutually exclusive
+    IFDEF DOS_PLUS3
+        IFDEF DOS_TRDOS
+            UNDEFINE DOS_TRDOS
+        ENDIF;DOS_TRDOS
+        DISPLAY "Building *** +3 DOS ***"
+    ELSE
+        DEFINE DOS_TRDOS
+        DISPLAY "Building *** TR-DOS ***"
+    ENDIF;DOS_PLUS3
+
+bankm       equ 0x5B5C      ; Copy of last byte output to I/O port 7FFDh (32765).
+
     page 0
     org int_handler-(variables_low_end-begin)
     assert $ >= 0x6000
 begin:
+    IFDEF DOS_PLUS3
+    ld a, 0xff
+    ld (var_plus3dos_present), a
+    jp main
+    db "Co",0
+    ELSE
     db "Code begin",0
+    ENDIF;DOS_PLUS3
     include "variables_low.asm"
 variables_low_end:
 
@@ -45,6 +65,9 @@ int_im2_vector_table:
     include "device.asm"
     include "fatfs.asm"
     include "disk.asm"
+  IFDEF DOS_PLUS3
+    include "plus3dos.asm"
+  ENDIF;DOS_PLUS3
     include "trdos.asm"
     include "ide.asm"
     include "mmc.asm"
@@ -67,9 +90,15 @@ main:
     im 2                            ; ...
     ld a, #10                       ; page BASIC48
     ld bc, #7ffd                    ; ...
+    ld (bankm), a                   ; ...
     out (c), a                      ; ...
     call device_detect_cpu_int      ;
+    IFDEF DOS_TRDOS
     call trdos_init                 ;
+    ENDIF;DOS_TRDOS
+    IFDEF DOS_PLUS3
+        call plus3_init
+    ENDIF;DOS_PLUS3
     call settings_load              ;
     call uart_init                  ;
     call input_init_kempston        ;
@@ -109,6 +138,7 @@ main:
 exit:
     xor a        ; page BASIC128
     ld bc, #7ffd ; ...
+    ld (bankm), a; ...
     out (c), a   ; ...
     ld b , #1f   ; ...
     out (c), a   ; ...
@@ -377,10 +407,19 @@ end:
     assert $ < stack_bottom
     org #BE00
 stack_bottom:
+    IFDEF DOS_PLUS3
+    ; Part 26 Using machine code
+    ; Remember also that the stack must be below BFE0h (49120)
+    ; and above 4000h (16384), and that there must be at least
+    ; 50 words of stack space available.
+    org #BFE0
+    ELSE
     org #BFFF
+    ENDIF;DOS_PLUS3
 stack_top:
 
 
+    export bankm
     export begin
     export end
     export main
@@ -388,4 +427,11 @@ stack_top:
     export var_trdos_present
     export var_settings_sector
     export settings_magic
+    IFDEF DOS_PLUS3
+        IFDEF __MODULE_DOS_PLUS3_RELOCATE__
+	DISPLAY "+3 DOS Driver @", PLUS3.__MODULE_DOS_PLUS3__BEGIN__
+        save3dos "zxmidipl.drv", PLUS3.__MODULE_DOS_PLUS3__BEGIN__,PLUS3.__MODULE_DOS_PLUS3_SIZE__
+        ENDIF;__MODULE_DOS_PLUS3_RELOCATE__
+        save3dos "zxmidipl.bin", begin, end-begin
+    ENDIF;DOS_PLUS3
     savebin "main.bin", begin, end-begin

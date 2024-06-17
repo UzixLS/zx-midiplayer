@@ -6,6 +6,17 @@
     includelua "lua/incbin_pages.lua"
     includelua "lua/incbin_rle.lua"
 
+    ; BAD: duplicated in main.asm ; move to config.inc?
+    ; make +3 and TR-DOS mutually exclusive
+    IFDEF DOS_PLUS3
+        IFDEF DOS_TRDOS
+            UNDEFINE DOS_TRDOS
+        ENDIF;DOS_TRDOS
+        DISPLAY "Building *** +3 DOS ***"
+    ELSE
+        DEFINE DOS_TRDOS
+        DISPLAY "Building *** TR-DOS ***"
+    ENDIF;DOS_PLUS3
 
 ; === SNA file ===
     page screens_page
@@ -18,6 +29,7 @@
         sj.insert_label("menu_scr_sna", sj.current_address); incbin_rle("res/menu.scr")
         sj.insert_label("play_scr_sna", sj.current_address); incbin_rle("res/play.scr")
         sj.insert_label("help_scr_sna", sj.current_address); incbin_rle("res/help.scr")
+        sj.parse_line("screens_end equ $")
 
         incbin_pages("res/start.scr",  0, nil, 0x4000, {0})
         incbin_pages("build/main.bin", 0, nil, _c("begin"), {0})
@@ -29,7 +41,76 @@
     emptytap "main.tap"
     page 0 : savetap "main.tap", main
 
+    IFDEF DOS_PLUS3
+; === +3 DOS screens page ===
+    DEFINE P3DOS_SCREENS_PTR    0x6000 ; can be 0x8000 if using zxmidipl.ldr
+    page 0
+    org P3DOS_SCREENS_PTR
 
+    di
+    ld a, (bankm)
+    ld (.save_page), a
+    ld a, #10 + screens_page              ; load all screens, they will be unpacked on demand
+    ld bc, #7ffd                          ; ...
+    ld (bankm), a                         ; ...
+    out (c), a                            ; ...
+    ld hl, screens_begin
+    ld de, screens_base
+    ld bc, screens_finish-screens_begin
+    ldir
+.save_page equ $ + 1
+    ld a, #10                                 ;
+    ld bc, #7ffd                              ;
+    ld (bankm), a                             ;
+    out (c), a                                ;
+    ei
+    ret
+
+screen_loading_code_end equ $
+    IFDEF SCREENS_COMPRESS_ZX0
+    lua allpass
+        sj.parse_line("screens_begin equ $")
+        sj.add_word(0)
+        sj.add_word(_c("menu_scr_p3")) -- screen_menu_ptr
+        sj.add_word(_c("play_scr_p3")) -- screen_play_ptr
+        sj.add_word(_c("help_scr_p3")) -- screen_help_ptr
+        sj.insert_label("menu_scr_p3", sj.current_address - _c("screens_begin") + _c("screens_base"));
+    endlua
+    incbin "res/menu.scr.zx0"
+    lua allpass
+        sj.insert_label("play_scr_p3", sj.current_address - _c("screens_begin") + _c("screens_base"));
+    endlua
+    incbin "res/play.scr.zx0"
+    lua allpass
+        sj.insert_label("help_scr_p3", sj.current_address - _c("screens_begin") + _c("screens_base"));
+    endlua
+    incbin "res/help.scr.zx0"
+    lua allpass
+        sj.parse_line("screens_finish equ $")
+    endlua
+    DISPLAY "+3 DOS GFX @", P3DOS_SCREENS_PTR
+    save3dos "zxmidipl.gfx", P3DOS_SCREENS_PTR, screens_finish-P3DOS_SCREENS_PTR
+    ELSE
+    lua allpass
+        sj.parse_line("screens_begin equ $")
+        sj.add_word(0)
+        sj.add_word(_c("menu_scr_p3")) -- screen_menu_ptr
+        sj.add_word(_c("play_scr_p3")) -- screen_play_ptr
+        sj.add_word(_c("help_scr_p3")) -- screen_help_ptr
+        sj.insert_label("menu_scr_p3", sj.current_address - _c("screens_begin") + _c("screens_base")); incbin_rle("res/menu.scr")
+        sj.insert_label("play_scr_p3", sj.current_address - _c("screens_begin") + _c("screens_base")); incbin_rle("res/play.scr")
+        sj.insert_label("help_scr_p3", sj.current_address - _c("screens_begin") + _c("screens_base")); incbin_rle("res/help.scr")
+        sj.parse_line("screens_finish equ $")
+    endlua
+    save3dos "zxmidipl.gfx", P3DOS_SCREENS_PTR, screens_finish-P3DOS_SCREENS_PTR
+    ENDIF;SCREENS_COMPRESS_ZX0
+
+; === +3 DOS code loader ===
+    INCLUDE "plus3-loader.asm"  ; P3DOS_SCREENS_PTR must be defined
+
+    ENDIF;DOS_PLUS3
+
+    IFDEF DOS_TRDOS
 ; === TRD file ===
 ramtop equ #5fb3
     assert begin > ramtop
@@ -48,6 +129,7 @@ boot_b:
     di                                    ;
     ld a, #10 + screens_page              ; load all screens, they will be unpacked on demand
     ld bc, #7ffd                          ; ...
+    ld (bankm), a                         ; ...
     out (c), a                            ; ...
     ld hl, screens_base                   ; ...
     ld b, screen_sectors                  ; ...
@@ -59,6 +141,7 @@ boot_b:
     out (#fe), a                          ; ...
     ld a, #10                             ; code
     ld bc, #7ffd                          ; ... load
+    ld (bankm), a                         ; ...
     out (c), a                            ; ...
     ld hl, #c000                          ; ...
     ld b, code_sectors                    ; ...
@@ -123,3 +206,4 @@ boot_b_end:
             _pc(string.format("savetrd \"main.trd\", \"%s\", 0, $", file_name))
         end
     endlua
+    ENDIF;DOS_TRDOS

@@ -5,7 +5,7 @@ endif
 
 export PATH:=/cygdrive/c/Hwdev/sjasmplus/:/cygdrive/e/Emulation/ZX Spectrum/Emuls/Es.Pectrum/:${PATH}
 
-SJOPTS = --nologo --fullpath --outprefix=build/ -DVERSION_DEF=\"${VERSION}\" -DVERSIONSHORT_DEF=\"${VERSIONSHORT}\"
+SJOPTS = --nologo --fullpath --outprefix=build/ -DVERSION_DEF=\"${VERSION}\" -DVERSIONSHORT_DEF=\"${VERSIONSHORT}\" $(OPTS) -DPLUS3_STARMID_PATTERN=\"*.*\"
 
 .PHONY: all clean run
 

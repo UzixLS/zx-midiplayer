@@ -1,8 +1,8 @@
 screens_base    equ #C000
-screens_page    equ 7
-screen_menu_ptr equ #C002
-screen_play_ptr equ #C004
-screen_help_ptr equ #C006
+screens_page    equ 1
+screen_menu_ptr equ screens_base + 2
+screen_play_ptr equ screens_base + 4
+screen_help_ptr equ screens_base + 6
 
     export screens_base
     export screens_page
@@ -16,15 +16,21 @@ screen_help_ptr equ #C006
 screen_load:
     ld a, #10 + screens_page                  ;
     ld bc, #7ffd                              ;
+    ld (bankm), a                             ;
     out (c), a                                ;
     ld e, (hl)                                ; src
     inc hl                                    ; ...
     ld d, (hl)                                ; ...
     ld hl, #4000                              ; dst
     ex de, hl                                 ;
+    IFDEF SCREENS_COMPRESS_ZX0
+    call dzx0_standard                        ;
+    ELSE
     call rle_unpack                           ;
+    ENDIF;SCREENS_COMPRESS_ZX0
     ld a, #10                                 ;
     ld bc, #7ffd                              ;
+    ld (bankm), a                             ;
     out (c), a                                ;
     ret                                       ;
 

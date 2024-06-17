@@ -21,3 +21,7 @@ rle_unpack:
     inc de                                ;
     djnz .fill                            ;
     jr rle_unpack                         ;
+
+    IFDEF SCREENS_COMPRESS_ZX0
+        INCLUDE "dzx0_standard.asm"
+    ENDIF;SCREENS_COMPRESS_ZX0

@@ -14,12 +14,86 @@ smuc        DB
 extraram    DB
 _reserv     BLOCK 256-14, 0
     ENDS
-    assert settings_t == trdos_sector_size
+    assert settings_t == settings_block_size
 
+
+    IFDEF DOS_PLUS3  ; TODO: if both defined?
+        DEFINE __MODULE_SETTINGS_IO_IMPLEMENTED__
+
+; OUT -  F - Z on success, NZ on fail
+p3_settings_load:
+        ld a, (var_disks.boot_n)    ; move it to disk_init? it doesn't change
+        ld (_p3_settings_file), a
+
+        ; TODO: common file path, only MODE_, _ACTION and DOS_READ/_WRITE are different
+        ld b, PLUS3.FILENO
+        ld c, 1 ; MODE_RD
+        ld de, 0x0001   ; Open the file, read the header (if any)
+        ld hl, _p3_settings_file
+        PLUS3CALL PLUS3.DOS_OPEN
+        jr nc, _error
+
+        ld b, PLUS3.FILENO
+        ld a, (bankm)
+        and 0x07
+        ld c, a
+        ld hl, var_settings
+        ld de, settings_t
+        PLUS3CALL PLUS3.DOS_READ
+
+_close:
+        push af     ; save READ status
+
+        ld b, PLUS3.FILENO
+        PLUS3CALL PLUS3.DOS_CLOSE
+
+        pop af      ; restore READ status, ignore CLOSE result
+        jr nc, _error
+
+_success:
+        ; since we have interrups mode 2, turn off motor right now
+        PLUS3CALL PLUS3.DD_L_OFF_MOTOR    ; AF BC DE HL IX corrupt
+        xor a   ; ZF=1
+        ret
+_error:
+        ; since we have interrups mode 2, turn off motor right now
+        PLUS3CALL PLUS3.DD_L_OFF_MOTOR    ; AF BC DE HL IX corrupt
+        or 0xff ; ZF=0
+        ret
+
+; OUT -  F - Z on success, NZ on fail
+p3_settings_save:
+        ld a, (var_disks.boot_n)    ; move it to disk_init? it doesn't change
+        ld (_p3_settings_file), a
+
+        ; TODO: common file path, only MODE_, _ACTION and DOS_READ/_WRITE are different
+        ld b, PLUS3.FILENO
+        ld c, 2 ; MODE_WR
+        ld de, 0x0203   ; FIXME:
+        ld hl, _p3_settings_file
+        PLUS3CALL PLUS3.DOS_OPEN
+        jr nc, _error
+
+        ld b, PLUS3.FILENO
+        ld a, (bankm)
+        and 0x07
+        ld c, a
+        ld hl, var_settings
+        ld de, settings_t
+        PLUS3CALL PLUS3.DOS_WRITE
+        jr _close
+
+_p3_settings_file:
+        defb 'X:zxmidipl.cfg',0xff
+
+settings_load   equ p3_settings_load
+settings_save   equ p3_settings_save
+    ELSE
+        DEFINE __MODULE_SETTINGS_IO_IMPLEMENTED__
 
 ; OUT -  F - Z on success, NZ on fail
 ; OUT - SP[0:sizeof(settings_t)-1] - loaded setting (only when ok)
-settings_load0:
+trdos_settings_load0:
     ld de, (var_settings_sector)                              ; error if var_setting_sector == 0
     ld a, d                                                   ; ...
     or e                                                      ; ...
@@ -61,8 +135,8 @@ settings_load0:
 
 
 ; OUT -  F - Z on success, NZ on fail
-settings_load:
-    call settings_load0                                       ;
+trdos_settings_load:
+    call trdos_settings_load0                                       ;
     ret nz                                                    ;
     ld hl, 0                                                  ;
     add hl, sp                                                ;
@@ -74,8 +148,8 @@ settings_load:
 
 
 ; OUT -  F - Z on success, NZ on fail
-settings_save:
-    call settings_load0                                       ; check if user didn't changed floppy disk
+trsdos_settings_save:
+    call trdos_settings_load0                                       ; check if user didn't changed floppy disk
     ret nz                                                    ; ...
     ld hl, settings_t                                         ; deallocate stack
     add hl, sp                                                ; ...
@@ -91,6 +165,18 @@ settings_save:
     ld b, 1                                                   ; ... one sector
     jp trdos_exec_fun                                         ; ...
 
+settings_load   equ trdos_settings_load
+settings_save   equ trsdos_settings_save
+    ENDIF;DOS_PLUS3
+
+    IFNDEF __MODULE_SETTINGS_IO_IMPLEMENTED__
+settings_load:
+settings_save:
+        or 0xff
+        ret
+    ELSE    ; internal DEFINE, let's limit its scope
+        UNDEFINE __MODULE_SETTINGS_IO_IMPLEMENTED__
+    ENDIF ;__MODULE_SETTINGS_IO_IMPLEMENTED__
 
 settings_apply:
     call input_init_kempston                                  ;

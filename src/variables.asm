@@ -33,6 +33,8 @@ var_trdos_present DB 0
 var_trdos_error DB 0
 var_trdos_cleared_screen DB 0
 
+var_plus3dos_present DB 0
+
 var_disks disks_t
 var_disk disk_t
 var_fatfs fatfs_state_t
