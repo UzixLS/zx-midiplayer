@@ -19,6 +19,8 @@ player_driver_select:
     jr z, .shama2095                     ;
     cp 4                                 ;
     jr z, .neogs                         ;
+    cp 5                                 ;
+    jr z, .nextuart                      ;
 .uart128:
     ld hl, uart_putc_txbuf               ;
     ld (player_driver_tx+1), hl          ;
@@ -43,6 +45,14 @@ player_driver_select:
     ld hl, neogs_vs1053_midi_flush_txbuf ;
     ld (player_driver_flush_txbuf+1), hl ;
     jp neogs_vs1053_midi_prepare         ;
+.nextuart:
+    ld hl, nextuart_putc                 ;
+    ld (player_driver_tx+1), hl          ;
+    ld (player_loop.A+1), hl             ;
+    ld (player_loop.B+1), hl             ;
+    ld hl, nextuart_flush_txbuf          ;
+    ld (player_driver_flush_txbuf+1), hl ;
+    jp nextuart_prepare                  ;
 
 player_driver_tx:
     jp 0

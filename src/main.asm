@@ -52,6 +52,7 @@ int_im2_vector_table:
     include "uart.asm"
     include "neogs.asm"
     include "shama2695.asm"
+    include "nextuart.asm"
     include "smf.asm"
     include "player.asm"
     include "screen.asm"

@@ -28,6 +28,7 @@ Quick demo video: https://www.youtube.com/watch?v=X_hX_dGmGeg
     - [MAYK](https://github.com/konkotgit/MAYK);
     - [Sizif-512](https://github.com/UzixLS/zx-sizif-512) [extension board](https://github.com/UzixLS/zx-sizif-512-ext);
     - [ZX-Uno.1010](https://github.com/UzixLS/zxuno1010-board) / [ZX-Uno](https://zxuno.speccy.org/index_e.shtml) MIDI addon.
+    - [ZX Spectrum Next MIDI Box](https://s-huehn.de/spectrum/hardware2.htm#nextmidi)
 
 ## 128K MIDI synthesizer wiring
 MIDI synthesizer data input should be connected to AY port A2.
