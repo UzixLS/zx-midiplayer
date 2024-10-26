@@ -6,6 +6,9 @@
     includelua "lua/incbin_pages.lua"
     includelua "lua/incbin_rle.lua"
 
+    ; BAD: duplicated in main.asm ; move to config.inc?
+        DEFINE DOS_TRDOS
+        DISPLAY "Building *** TR-DOS ***"
 
 ; === SNA file ===
     page screens_page
@@ -18,6 +21,7 @@
         sj.insert_label("menu_scr_sna", sj.current_address); incbin_rle("res/menu.scr")
         sj.insert_label("play_scr_sna", sj.current_address); incbin_rle("res/play.scr")
         sj.insert_label("help_scr_sna", sj.current_address); incbin_rle("res/help.scr")
+        sj.parse_line("screens_end equ $")
 
         incbin_pages("res/start.scr",  0, nil, 0x4000, {0})
         incbin_pages("build/main.bin", 0, nil, _c("begin"), {0})
@@ -29,7 +33,7 @@
     emptytap "main.tap"
     page 0 : savetap "main.tap", main
 
-
+    IFDEF DOS_TRDOS
 ; === TRD file ===
 ramtop equ #5fb3
     assert begin > ramtop
@@ -48,6 +52,7 @@ boot_b:
     di                                    ;
     ld a, #10 + screens_page              ; load all screens, they will be unpacked on demand
     ld bc, #7ffd                          ; ...
+    ld (bankm), a                         ; ...
     out (c), a                            ; ...
     ld hl, screens_base                   ; ...
     ld b, screen_sectors                  ; ...
@@ -59,6 +64,7 @@ boot_b:
     out (#fe), a                          ; ...
     ld a, #10                             ; code
     ld bc, #7ffd                          ; ... load
+    ld (bankm), a                         ; ...
     out (c), a                            ; ...
     ld hl, #c000                          ; ...
     ld b, code_sectors                    ; ...
@@ -123,3 +129,4 @@ boot_b_end:
             _pc(string.format("savetrd \"main.trd\", \"%s\", 0, $", file_name))
         end
     endlua
+    ENDIF;DOS_TRDOS

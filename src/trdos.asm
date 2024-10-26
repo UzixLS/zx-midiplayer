@@ -1,3 +1,6 @@
+;
+
+    IFDEF DOS_TRDOS
 ; TR-DOS directory entry:
 ; 0......7 8 9  B  D E F
 ; NNNNNNNN T AA LL C S T
@@ -53,7 +56,12 @@ trdos_fun_select_side_0      equ #16
 trdos_fun_select_side_1      equ #17
 trdos_fun_reconfig_floppy    equ #18
 
-
+    ; it's DEFINE and not EQU because it's easier to check with IFDEF
+    IFNDEF settings_block_size
+        DEFINE settings_block_size trdos_sector_size
+    ELSE
+        ASSERT settings_block_size==trdos_sector_size
+    ENDIF;settings_block_size
 
 trdos_basic_interceptor:
     ex (sp), hl                      ;
@@ -422,3 +430,5 @@ trdos_in:                           ;
     push hl                         ;
     di                              ;
     jp trdos_entrypoint_jump        ;
+
+    ENDIF;DOS_TRDOS

@@ -14,12 +14,14 @@ smuc        DB
 extraram    DB
 _reserv     BLOCK 256-14, 0
     ENDS
-    assert settings_t == trdos_sector_size
+    assert settings_t == settings_block_size
 
+    IFDEF DOS_TRDOS
+        DEFINE __MODULE_SETTINGS_IO_IMPLEMENTED__
 
 ; OUT -  F - Z on success, NZ on fail
 ; OUT - SP[0:sizeof(settings_t)-1] - loaded setting (only when ok)
-settings_load0:
+trdos_settings_load0:
     ld de, (var_settings_sector)                              ; error if var_setting_sector == 0
     ld a, d                                                   ; ...
     or e                                                      ; ...
@@ -61,8 +63,8 @@ settings_load0:
 
 
 ; OUT -  F - Z on success, NZ on fail
-settings_load:
-    call settings_load0                                       ;
+trdos_settings_load:
+    call trdos_settings_load0                                       ;
     ret nz                                                    ;
     ld hl, 0                                                  ;
     add hl, sp                                                ;
@@ -74,8 +76,8 @@ settings_load:
 
 
 ; OUT -  F - Z on success, NZ on fail
-settings_save:
-    call settings_load0                                       ; check if user didn't changed floppy disk
+trsdos_settings_save:
+    call trdos_settings_load0                                       ; check if user didn't changed floppy disk
     ret nz                                                    ; ...
     ld hl, settings_t                                         ; deallocate stack
     add hl, sp                                                ; ...
@@ -91,6 +93,18 @@ settings_save:
     ld b, 1                                                   ; ... one sector
     jp trdos_exec_fun                                         ; ...
 
+settings_load   equ trdos_settings_load
+settings_save   equ trsdos_settings_save
+    ENDIF;DOS_TRDOS
+
+    IFNDEF __MODULE_SETTINGS_IO_IMPLEMENTED__
+settings_load:
+settings_save:
+        or 0xff
+        ret
+    ELSE    ; internal DEFINE, let's limit its scope
+        UNDEFINE __MODULE_SETTINGS_IO_IMPLEMENTED__
+    ENDIF ;__MODULE_SETTINGS_IO_IMPLEMENTED__
 
 settings_apply:
     call input_init_kempston                                  ;
