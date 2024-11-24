@@ -1,4 +1,7 @@
-;
+; Copyright 2024 TIsland Crew
+; SPDX-License-Identifier: GPL-3.0+
+
+; this file should be included by the build.asm
 
 ; === esxDOS ===
     PAGE 0

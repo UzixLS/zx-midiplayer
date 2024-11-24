@@ -184,6 +184,7 @@ settings_menuentry_output:
     DW str_ts2.end
     DW str_shama.end
     DW str_neogs1053.end
+.zxnext:
     DW str_zxnext.end
 settings_menuentry_divmmc:
     DB 2

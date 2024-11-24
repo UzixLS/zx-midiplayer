@@ -50,6 +50,7 @@ int_im2_vector_table:
     include "fatfs.asm"
     include "disk.asm"
     include "trdos.asm"
+    include "zxnextos.asm"
     include "ide.asm"
     include "mmc.asm"
     include "settings.asm"
@@ -75,6 +76,9 @@ main:
     ld (bankm), a                   ; ...
     out (c), a                      ; ...
     call device_detect_cpu_int      ;
+    IFDEF ZXNEXTOS
+    call zxnextos_init
+    ENDIF;ZXNEXTOS
     IFDEF DOS_TRDOS
     call trdos_init                 ;
     ENDIF;DOS_TRDOS

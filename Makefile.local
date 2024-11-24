@@ -20,6 +20,9 @@ build:
 esxdos: SJOPTS += -DDOS_ESXDOS
 esxdos: bundle
 
+next: SJOPTS += -DZXNEXTOS -DDOS_ESXDOS
+next: bundle
+
 dist: zxmidipl.zip
 
 zxmidipl.zip: build/zxmidipl.bas build/zxmidipl.esx res/test0.mid

@@ -1,4 +1,5 @@
-;
+; Copyright 2024 TIsland Crew
+; SPDX-License-Identifier: GPL-3.0+
 
     MODULE    SETTINGS_ESXDOS
 
