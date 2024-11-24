@@ -12,6 +12,7 @@ SJOPTS = --nologo --fullpath --outprefix=build/ -DVERSION_DEF=\"${VERSION}\" -DV
 all:
 	@mkdir -p build
 	sjasmplus --msg=war --lst=build/main.lst --exp=build/main.exp --sld=build/main.sld ${SJOPTS} src/main.asm
+	sjasmplus --msg=war --lst=build/assets.lst ${SJOPTS} src/assets.asm
 	sjasmplus --msg=err --lst=build/build.lst ${SJOPTS} src/build.asm
 
 clean:

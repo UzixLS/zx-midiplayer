@@ -7,8 +7,7 @@
     include "config.inc"
     include "layout.inc"
 
-        DEFINE DOS_TRDOS
-        DISPLAY "Building *** TR-DOS ***"
+    include "build.inc"
 
 bankm       equ 0x5B5C      ; Copy of last byte output to I/O port 7FFDh (32765).
 

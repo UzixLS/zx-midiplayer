@@ -6,25 +6,13 @@
     includelua "lua/incbin_pages.lua"
     includelua "lua/incbin_rle.lua"
 
-    ; BAD: duplicated in main.asm ; move to config.inc?
-        DEFINE DOS_TRDOS
-        DISPLAY "Building *** TR-DOS ***"
+    include "build.inc"
 
 ; === SNA file ===
-    page screens_page
-    org screens_base
     lua allpass
-        sj.add_word(0)
-        sj.add_word(_c("menu_scr_sna")) -- screen_menu_ptr
-        sj.add_word(_c("play_scr_sna")) -- screen_play_ptr
-        sj.add_word(_c("help_scr_sna")) -- screen_help_ptr
-        sj.insert_label("menu_scr_sna", sj.current_address); incbin_rle("res/menu.scr")
-        sj.insert_label("play_scr_sna", sj.current_address); incbin_rle("res/play.scr")
-        sj.insert_label("help_scr_sna", sj.current_address); incbin_rle("res/help.scr")
-        sj.parse_line("screens_end equ $")
-
         incbin_pages("res/start.scr",  0, nil, 0x4000, {0})
         incbin_pages("build/main.bin", 0, nil, _c("begin"), {0})
+        incbin_pages("build/main.gfx", 0, nil, _c("screens_base"), {1})
         incbin_pages("res/test0.mid",  0, nil, 0xC000, {0,4,6,3})
     endlua
     page 0 : savesna "main.sna", main
@@ -32,6 +20,10 @@
 ; === TAP file ===
     emptytap "main.tap"
     page 0 : savetap "main.tap", main
+
+    IFDEF DOS_ESXDOS
+        include "build.esxdos.asm"
+    ENDIF
 
     IFDEF DOS_TRDOS
 ; === TRD file ===

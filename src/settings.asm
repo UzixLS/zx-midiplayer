@@ -14,7 +14,11 @@ smuc        DB
 extraram    DB
 _reserv     BLOCK 256-14, 0
     ENDS
-    assert settings_t == settings_block_size
+
+    IFDEF DOS_ESXDOS
+        DEFINE settings_block_size 256
+        INCLUDE "settings.esxdos.asm"
+    ENDIF;DOS_ESXDOS
 
     IFDEF DOS_TRDOS
         DEFINE __MODULE_SETTINGS_IO_IMPLEMENTED__
@@ -102,8 +106,13 @@ settings_load:
 settings_save:
         or 0xff
         ret
-    ELSE    ; internal DEFINE, let's limit its scope
+    ELSE ; no IO implementation for settings persitence
+        ; internal DEFINE, let's limit its scope
         UNDEFINE __MODULE_SETTINGS_IO_IMPLEMENTED__
+
+        ; check that settings_t size is alright only if IO defined
+        assert settings_t == settings_block_size
+
     ENDIF ;__MODULE_SETTINGS_IO_IMPLEMENTED__
 
 settings_apply:
