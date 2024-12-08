@@ -42,6 +42,7 @@ file_get_next_byte:
     ld c, a                          ; ...
     ld a, (bc)                       ; ...
     ld bc, #7ffd                     ;
+    ld (bankm), a                    ;
     out (c), a                       ;
 .get:
     ld a, h                          ; position = position[5:0]
@@ -56,6 +57,9 @@ file_get_next_byte:
 
 disk_sector_size equ 512
 
+; added to .driver field to mark devices without a valid filesystem
+DISK_DRIVER_NOFS_MASK   equ #08
+DISK_DRIVER_TRDOS       equ #00
 DISK_DRIVER_DIVMMC      equ #10
 DISK_DRIVER_ZXMMC       equ #20
 DISK_DRIVER_ZCONTROLLER equ #30
@@ -67,14 +71,14 @@ DISK_DRIVER_SMUC        equ #70 | #80
 driver         DB
 offset         DD
 disk_param     DB
+label          DB
 fatfs          fatfs_disk_t
-_reserv        BLOCK 1, 0
     ENDS
     STRUCT disks_t
-boot_n         DB
-current_n      DB
-current_ptr    DW
-count          DB
+boot_n         DB   ; boot disk ID, depends on the OS
+current_n      DB   ; selected disk number
+current_ptr    DW   ; pointer to the current disk in .all
+count          DB   ; number of disks found
 all            BLOCK disk_t*DISKS_MAX_COUNT
     ENDS
 
@@ -148,7 +152,18 @@ disks_scan_filesystems:
     ld (var_disk.offset+0), hl         ;
     push bc                            ;
     call fatfs_init                    ;
-    call z, disks_save_new             ;
+    jr nz, .no_fs
+    ; partition entry, assign name to be 'A'+idx
+    ld a, (var_disk.driver)
+    and 0x01    ; unit number
+    ; .3 rrca     ; 'A'-'D' for unit 0, 'a'-'d' for unit 1
+    .2 rlca     ; 'A'-'D' for unit 0, 'E'-'H' for unit 1
+    add 'A'
+    add ixh
+    ld hl, var_disk.label
+    ld (hl), a
+    call disks_save_new                ;
+.no_fs:
     pop bc                             ;
     djnz .check_partition_filesystem   ;
     ret                                ;
@@ -169,7 +184,7 @@ disks_scan_filesystems:
     or (hl)                            ; ...
     ret z                              ; ...
     pop ix                             ; return address
-1:  ex de, hl                          ; save PT_LbaOfs
+    ex de, hl                          ; save PT_LbaOfs
     ld e, (hl) : inc hl                ; ...
     ld d, (hl) : inc hl                ; ...
     push de                            ; ...
@@ -196,9 +211,7 @@ disks_scan_mmc:
     call disks_scan_filesystems        ;
     xor a : or ixh                     ; if there is no filesystems on disk - add it anyway, but deny any access to it
     ret nz                             ;
-    ld a, #01                          ; ...
-    ld (var_disk.driver), a            ; ...
-    jp disks_save_new                  ; ...
+    jr _disks_scan_no_fs
 
 
 ; IN  -  A - driver | disk_number
@@ -217,9 +230,52 @@ disks_scan_ide:
     call disks_scan_filesystems        ;
     xor a : or ixh                     ; if there is no filesystems on disk - add it anyway, but deny any access to it
     ret nz                             ;
-    ld a, #81                          ; ...
+    ;jr disks_scan_no_fs               ; fall through
+
+; no valid filesystem found on the device
+; add it anyway, but deny any access to it
+_disks_scan_no_fs:
+    ld a, (var_disk.driver)
+    or DISK_DRIVER_NOFS_MASK
     ld (var_disk.driver), a            ; ...
+    ld a, '-'
+    ld (var_disk.label), a
     jp disks_save_new                  ; ...
+
+    IFDEF DOS_TRDOS
+disks_scan_trdos:
+    ; TODO: code similar to _disk_save_device_name_a, merge?
+    assert disk_t == 16
+    ; that "cleanup" code below must be present somewhere, surely :)
+    ; cleanup var_disk, fill in relevant fields, call disks_save_new
+    ld hl, var_disk
+    ld de, var_disk+1
+    ld bc, disk_t
+    xor a
+    ld (hl), a
+    ldir
+    ; prefill driver field, it is not going to change
+    ld a, DISK_DRIVER_TRDOS
+    ld (var_disk.driver), a
+    ;
+    ld b, trdos_disks   ; counter for djnz loop
+    ld a, 'A'           ; first device name
+.loop:
+    ld hl, var_disk.label
+    ld (hl), a
+    ; we use disk_param for "target drive" when switching
+    ; and keep label as UI element only
+    ld hl, var_disk.disk_param
+    ld (hl), a
+    push af
+    push bc
+    call disks_save_new ; counter in the ixh
+    pop bc
+    pop af
+    inc a
+    djnz .loop
+    ret
+    ENDIF;DOS_TRDOS
 
 
 ; OUT - AF - garbage
@@ -232,12 +288,13 @@ disks_init:
     ld (var_disks.count), a            ;
     ld (var_disks.current_ptr+0), a    ;
     ld (var_disks.current_ptr+1), a    ;
+    IFDEF DOS_TRDOS
 .scan_trdos:
     ld a, (var_trdos_present)          ;
     or a                               ;
     jr z, .scan_divide                 ;
-    ld a, trdos_disks                  ;
-    ld (var_disks.count), a            ;
+    call disks_scan_trdos
+    ENDIF;DOS_TRDOS
 .scan_divide:
     ld a, (var_settings.divide)        ;
     or a                               ;
@@ -402,7 +459,9 @@ disk_change:
     ldir                                     ; ...
     ld a, (var_disk.driver)                  ; determine driver type
     or a                                     ; ...
+    IFDEF DOS_TRDOS
     jr z, .trd                               ; ...
+    ENDIF;DOS_TRDOS
 .fat:
     ld hl, fatfs_entry_is_directory          ;
     ld (disk_entry_is_directory+1), hl       ;
@@ -416,6 +475,7 @@ disk_change:
     jp m, ide_driver_select                  ; ... check bit 7
 .mmc:
     jp mmc_driver_select                     ; ...
+    IFDEF DOS_TRDOS
 .trd:
     ld hl, trdos_entry_is_directory          ;
     ld (disk_entry_is_directory+1), hl       ;
@@ -429,8 +489,7 @@ disk_change:
     ld (var_disks.current_ptr), hl           ;
     xor a                                    ; set Z flag
     ret                                      ;
-
-
+    ENDIF;DOS_TRDOS
 
 ; IN  - HL - pointer to file extension
 ; OUT -  A - icon
@@ -475,17 +534,31 @@ disks_get_icon_by_extension:
 ; OUT - HL - garbage
 disks_menu_generator:
     ld ix, tmp_menu_string              ;
-    ld a, 'A'                           ;
-    add a, e                            ;
-    ld (ix+1), a                        ;
-    ld (ix+2), ':'                      ;
-    ld (ix+3), 0                        ;
-.icon:
+    push de
     assert disk_t == 16
     ld h, 0 : ld l, e                   ; de = &disks.all[count]
     .4 add hl, hl                       ; ...
     ld de, var_disks.all                ; ...
     add hl, de                          ; ...
+.device:
+    call .fill.type
+    push hl
+    ld de, disk_t.label
+    add hl, de
+    ld a, (hl)
+    pop hl
+    pop de
+    or a
+    jr nz, .name
+    ld a, (hl)  ; driver
+    and 0x01    ; lower bit - unit number
+    add '0'
+.name:
+    ; TODO: check partition offset, add unit number at +6?
+    ld (ix+6), ' '
+    ld (ix+7), a
+    ld (ix+8), 0    ; NULL terminator
+.icon:
     ld a, (hl)                          ; determine driver type
     or a                                ; ...
     jr z, .trd                          ; ...
@@ -502,3 +575,39 @@ disks_menu_generator:
     ld (ix+0), udg_floppy               ;
     xor a                               ; set Z flag
     ret                                 ;
+.fill.type:
+        push hl
+        ld a, (hl)  ; driver
+        cp DISK_DRIVER_TRDOS
+        jr nz, .other
+        ld hl, .drv.n.trdos
+        jr .fill
+.other:
+        and 0x7f    ; higher bit means IDE, but type number is unique
+        ; I wish we had NEXT's SWAPNIB :)
+        .4 srl a    ; can it be simplified?
+        ld e, a
+        ld d, 0
+        ld hl, .drv.n.index
+        .5 add hl, de
+.fill:
+        ld d, ixh : ld e, ixl
+        inc de  ; ix+1 -- name (ix+0 -- icon)
+        ld bc, 5
+        ldir
+        pop hl
+        ret
+
+;                     12345
+.drv.n.trdos:   defb 'TRDOS'
+.drv.n.plus3:   defb '+3   '
+.drv.n.index    equ .drv.n.plus3
+.drv.n.divmmc:  defb 'DVMMC'
+.drv.n.zxmmc:   defb 'ZXMMC'
+.drv.n.zc:      defb 'Z-C  '
+.drv.n.neogs:   defb 'NEOGS'
+.drv.n.divide:  defb 'DVIDE'
+.drv.n.nemoide: defb 'NEMO '
+.drv.n.smuc:    defb 'SMUC '
+;                     12345
+;.drv.n.unkn:    defb 'unkwn'

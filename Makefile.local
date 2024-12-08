@@ -1,0 +1,31 @@
+#
+
+SOURCES = $(shell find src -name '*.asm')
+SRCS_BLD = $(shell find src -name 'build*.asm)
+
+bundle: build/main.lst build/main.gfx build/build.lst
+
+build/main.lst: $(SOURCES) | build
+	sjasmplus --msg=war --lst=build/main.lst --exp=build/main.exp --sld=build/main.sld ${SJOPTS} src/main.asm
+
+build/main.gfx: src/assets.asm  | build
+	sjasmplus --msg=war --lst=build/assets.lst ${SJOPTS} src/assets.asm
+
+build/build.lst: $(SRC_BLD) | build
+	sjasmplus --msg=err --lst=build/build.lst ${SJOPTS} src/build.asm
+
+build:
+	mkdir -p $@
+
+esxdos: SJOPTS += -DDOS_ESXDOS
+esxdos: bundle
+
+next: SJOPTS += -DZXNEXTOS -DDOS_ESXDOS
+next: bundle
+
+dist: zxmidipl.zip
+
+zxmidipl.zip: build/zxmidipl.bas build/zxmidipl.esx res/test0.mid
+	zip -jr9 $@ $^
+
+# EOF vim: noet:ai:ts=8:sw=8:

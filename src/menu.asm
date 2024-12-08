@@ -383,6 +383,7 @@ menu_dummy_callback:
 ; menu_debug_loop:
 ;     ld a, #1f
 ;     ld bc, #7ffd
+;     ld (bankm), a
 ;     out (c), a
 ;     ld a, #c0
 ;     call screen_select
