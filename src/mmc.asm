@@ -235,37 +235,24 @@ CARDTYPE_SDHC equ 3
 ; OUT - BC - garbage
 ; OUT - HL - 0
 mmc_cmd:
-    call mmc_wait_not_busy             ;
-    ld a, #ff                          ;
-    ret nz                             ; zesarux fails there
-    ld b, 6                            ;
-.loop:
-    ld a, (hl)                         ;
-    inc hl                             ;
-    call mmcdrv_tx                     ;
-    djnz .loop                         ;
-    ; jp mmc_wait_r1                     ;
-
-
-; OUT - F - Z on success, NZ on fail
-; OUT - A - R1
-; OUT - B - garbage
-mmc_wait_r1:
-    ld b, 32                           ; Ncr = 0..8 (SD) / 1..8 (MMC)
-1:  call mmcdrv_rx                     ;
-    bit 7, a                           ;
-    ret z                              ;
-    djnz 1b                            ;
-    ret                                ;
-
-
-; OUT - F - Z on success, NZ on fail
-; OUT - A - #ff
-; OUT - B - garbage
-mmc_wait_not_busy:
+.wait_not_busy:
     ld b, 0                            ;
 1:  call mmcdrv_rx                     ;
-    cp #ff                             ;
+    inc a                              ; if got 0xFF - continue
+    jr z, .send                        ; ...
+    djnz 1b                            ; else - retry
+    ld a, #ff                          ; fail
+    ret                                ; ...
+.send:
+    ld b, 6                            ;
+1:  ld a, (hl)                         ;
+    inc hl                             ;
+    call mmcdrv_tx                     ;
+    djnz 1b                            ;
+.read_r1:
+    ld b, 32                           ;
+1:  call mmcdrv_rx                     ;
+    bit 7, a                           ;
     ret z                              ;
     djnz 1b                            ;
     ret                                ;
