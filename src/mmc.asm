@@ -422,14 +422,13 @@ mmc_read_block:
     ld a, (var_int_counter)            ;
     add a, MMC_READ_TIMEOUT            ;
     ld d, a                            ;
-    ld b, 0                            ;
 1:  call mmcdrv_rx                     ;
     cp #fe                             ;
     jr z, .read_data                   ;
     ld a, (var_int_counter)            ; timeout expired?
     cp d                               ; ...
     jr z, .err                         ; ...
-    djnz 1b                            ;
+    jr 1b                              ;
 .read_data:
     ld b, 0                            ; get 512 bytes
     call mmcdrv_rxblock                ; ...
