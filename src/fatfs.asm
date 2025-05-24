@@ -91,6 +91,7 @@ dir_window_files_cnt     DW
 dir_window_cluster_n     DD
 dir_window_cluster_pos   DW
 dir_window_sector_pos    DB
+dir_end_flag             DB
     ENDS
 
 
@@ -366,6 +367,9 @@ fatfs_get_entry:
     call fatfs_directory_load_prev_window      ;
     jr 1f                                      ;
 .entry_after_window:
+    ld a, (var_fatfs.dir_end_flag)             ; end of directory reached?
+    or a                                       ; ...
+    jr nz, 1f                                  ; ...
     call fatfs_directory_load_next_window      ;
 1:  pop hl                                     ;
     pop de                                     ;
@@ -373,19 +377,231 @@ fatfs_get_entry:
     jr fatfs_get_entry                         ;
 
 
-; IN  - DE - entry number
-; OUT -  F - NZ when yes, Z when no
+; OUT -   F - Z on success, NZ on fail
+; OUT -   A - garbage
+; OUT -  BC - garbage
+; OUT -  DE - garbage
+; OUT -  HL - garbage
+; OUT - IXL - garbage
+; OUT - DE' - garbage
+; OUT - HL' - garbage
+fatfs_directory_load_next_window:
+    exx                                             ;
+    ld de, (var_fatfs.dir_window_files_cnt)         ; DE' = files_count_prev
+    ld hl, (var_fatfs.dir_window_cluster_pos)       ; HL' = cluster_pos
+    exx                                             ;
+    ld bc, (var_fatfs.dir_window_cluster_n+0)       ;
+    ld de, (var_fatfs.dir_window_cluster_n+2)       ;
+    ld hl, (var_fatfs.dir_window_sector_pos)        ; L = sector_pos
+    ld a, (var_disk.fatfs.BPB_SecPerClus)           ; if sector_pos is last sector in cluster - get next cluster
+    dec a                                           ; ...
+    cp l                                            ; ...
+    jr z, .next_cluster                             ; ...
+.next_sector:
+    ld h, 0 : inc l                                 ; sector_pos++
+    jr .read                                        ;
+.next_cluster:
+    exx                                             ; cluster_pos++
+    inc hl                                          ; ...
+    exx                                             ; ...
+    call fatfs_get_next_cluster_n                   ; DEBC = next cluster_n
+    ret nz                                          ; ...
+    ld hl, 0                                        ; sector_pos = 0
+.read:
+    call fatfs_directory_read                       ;
+    ret nz                                          ;
+    exx                                             ;
+    ld (var_fatfs.dir_window_cluster_pos), hl       ; save cluster_pos
+    ld hl, (var_fatfs.dir_window_first_file_n)      ; first_file += files_count_prev
+    add hl, de                                      ; ...
+    ld (var_fatfs.dir_window_first_file_n), hl      ; ...
+    exx                                             ;
+    xor a                                           ; set Z flag
+    ret                                             ;
+
+
+; OUT -  F - Z on success, NZ on fail
 ; OUT -  A - garbage
 ; OUT - BC - garbage
+; OUT - DE - garbage
 ; OUT - HL - garbage
-fatfs_entry_is_directory:
-    call fatfs_get_entry                       ;
-    ret nz                                     ;
-    ld bc, DIR_Attr                            ;
-    add hl, bc                                 ;
-    ld a, (hl)                                 ;
-    and #10                                    ;
-    ret                                        ;
+; OUT - IXL - garbage
+; OUT - HL' - garbage
+fatfs_directory_load_prev_window:
+    exx                                             ;
+    ld hl, (var_fatfs.dir_window_cluster_pos)       ;
+    exx                                             ;
+    ld hl, (var_fatfs.dir_window_cluster_pos)       ;
+    ld a, (var_fatfs.dir_window_sector_pos)         ;
+    or a                                            ; if current sector is first sector in cluster - get prev cluster
+    jr z, .prev_cluster                             ; ...
+.prev_sector:
+    dec a                                           ; sector_pos--
+    ld h, 0 : ld l, a                               ; ...
+    ld bc, (var_fatfs.dir_window_cluster_n+0)       ;
+    ld de, (var_fatfs.dir_window_cluster_n+2)       ;
+    jr .read                                        ;
+.prev_cluster:
+    ld a, h : or l                                  ; already on first cluster in chain?
+    jr nz, 1f                                       ; ...
+    or 1                                            ; ... set NZ flag
+    ret                                             ; ...
+1:  exx                                             ; cluster_pos--
+    dec hl                                          ; ...
+    exx                                             ; ...
+    dec hl                                          ; get prev cluster n
+    ld bc, (var_fatfs.current_dir+0)                ; ...
+    ld de, (var_fatfs.current_dir+2)                ; ...
+    call fatfs_get_nth_cluster_n                    ; ...
+    ret nz                                          ; ...
+    ld hl, (var_disk.fatfs.BPB_SecPerClus)          ; sector_pos = last sector in cluster
+    dec l                                           ;
+    ld h, 0                                         ;
+.read:
+    call fatfs_directory_read                       ;
+    ret nz                                          ;
+    ld bc, (var_fatfs.dir_window_files_cnt)         ; first_file -= files_count
+    ld hl, (var_fatfs.dir_window_first_file_n)      ; ...
+    or a                                            ; ...
+    sbc hl, bc                                      ; ...
+    ld (var_fatfs.dir_window_first_file_n), hl      ; ...
+    exx                                             ; save cluster_pos
+    ld (var_fatfs.dir_window_cluster_pos), hl       ; ...
+    exx                                             ; ...
+    xor a                                           ; set Z flag
+    ret                                             ;
+
+
+; IN  - DE - entry number or 0xffff for root directory
+; OUT -  F - Z on success, NZ on fail
+; OUT -  A - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
+; OUT - IX - garbage
+fatfs_directory_load:
+    ld a, #ff                                       ;
+    cp d : jr nz, .get_dir_info                     ;
+    cp e : jr nz, .get_dir_info                     ;
+    jr z, .root_dir                                 ;
+.get_dir_info:
+    call fatfs_get_entry                            ;
+    ret nz                                          ;
+    ld de, DIR_FstClusHI                            ;
+    add hl, de                                      ;
+    ld e, (hl) : inc hl : ld d, (hl)                ;
+    ld bc, DIR_FstClusLO-DIR_FstClusHI-1            ;
+    add hl, bc                                      ;
+    ld c, (hl) : inc hl : ld b, (hl)                ;
+    ld a, d : or e : or b : or c                    ; if cluster_n == 0 - root directory
+    jr nz, .chdir                                   ; ...
+.root_dir:
+    ld bc, (var_disk.fatfs.BPB_RootClus+0)          ;
+    ld de, (var_disk.fatfs.BPB_RootClus+2)          ;
+.chdir:
+    ld (var_fatfs.current_dir+0), bc                ;
+    ld (var_fatfs.current_dir+2), de                ;
+    ld hl, 0                                        ;
+    ld (var_fatfs.dir_window_first_file_n), hl      ;
+    ld (var_fatfs.dir_window_cluster_pos), hl       ;
+    ; jp fatfs_directory_read                         ;
+
+
+; IN  - DEBC - cluster n
+; IN -    HL - sector pos (0-255)
+; OUT -    F - Z on success, NZ on fail
+; OUT -    A - garbage
+; OUT -   BC - garbage
+; OUT -   DE - garbage
+; OUT -   HL - garbage
+; OUT -   IX - garbage
+fatfs_directory_read:
+    push de                                         ;
+    push bc                                         ;
+    push hl                                         ;
+    call fatfs_get_lba                              ;
+    jr z, 1f                                        ;
+    .3 pop hl                                       ;
+    ret                                             ;
+1:  ld hl, dir_buffer                               ;
+    ld ixl, 1                                       ;
+    call disk_read_sectors                          ;
+    jr z, 1f                                        ;
+    .3 pop hl                                       ;
+    ret                                             ;
+1:  pop hl                                          ;
+    ld a, l                                         ;
+    ld (var_fatfs.dir_window_sector_pos), a         ;
+    pop hl                                          ;
+    ld (var_fatfs.dir_window_cluster_n+0), hl       ;
+    pop hl                                          ;
+    ld (var_fatfs.dir_window_cluster_n+2), hl       ;
+    ; jp fatfs_directory_parse                        ;
+
+
+; OUT -  F - Z=1
+; OUT -  A - garbage
+; OUT - BC - garbage
+; OUT - DE - garbage
+; OUT - HL - garbage
+; OUT - IX - garbage
+fatfs_directory_parse:
+    xor a                                      ;
+    ld (var_fatfs.dir_end_flag), a             ;
+    ld hl, 0                                   ;
+    ld (var_fatfs.dir_window_files_cnt), hl    ;
+    ld ix, dir_buffer                          ; src
+    ld de, dir_buffer                          ; dst
+.loop:
+    ld a, (ix+DIR_Name+0)                      ;
+    or a                                       ; end of directory?
+    jr nz, 1f                                  ; ...
+    ld a, 1                                    ; ...
+    ld (var_fatfs.dir_end_flag), a             ; ...
+    ret                                        ; ...
+1:  push ix                                    ;
+    cp #e5                                     ; deleted entry?
+    jr z, .next                                ; ...
+.handle_dot_dir:
+    cp '.'                                     ; skip directory with name '.'
+    jr nz, .handle_hidden_entries              ; ...
+    ld a, (ix+DIR_Attr)                        ; ...
+    and #10                                    ; ... is directory?
+    jr z, .handle_hidden_entries               ; ...
+    ld a, (ix+DIR_Name+1)                      ; ...
+    cp ' '                                     ; ...
+    jr z, .next                                ; ...
+.handle_dot_dot_dir:
+    cp '.'                                     ; show '..' event if it have system or hidden attribute
+    jr nz, .handle_hidden_entries              ; ...
+    ld a, (ix+DIR_Name+2)                      ; ...
+    cp ' '                                     ; ...
+    jr nz, .handle_hidden_entries              ; ...
+    ld a, (ix+DIR_Attr)                        ; skip volume files
+    and #08                                    ; ...
+    jr nz, .next                               ; ...
+    jr .save_entry                             ;
+.handle_hidden_entries:
+    ld a, (ix+DIR_Attr)                        ; skip hidden, system and volume files
+    and #0e                                    ; ...
+    jr nz, .next                               ; ...
+.save_entry:
+    pop hl                                     ;
+    push hl                                    ;
+    ld bc, 32                                  ; save this entry
+    ldir                                       ; ...
+    ld hl, (var_fatfs.dir_window_files_cnt)    ; cnt++
+    inc hl                                     ; ...
+    ld (var_fatfs.dir_window_files_cnt), hl    ; ...
+.next:
+    pop hl                                     ; check ix+32 >= dir_buffer+512 (sector size)
+    ld bc, #ffff-disk_sector_size-dir_buffer+32+1 ; ...
+    xor a                                      ; set Z flag
+    add hl, bc                                 ; ...
+    ret c                                      ; ...
+    ld bc, 32                                  ;
+    add ix, bc                                 ;
+    jr .loop                                   ;
 
 
 ; IN  - DE - entry number
@@ -470,221 +686,19 @@ fatfs_file_menu_generator:
     ret                                        ;
 
 
-
-; OUT -   F - Z on success, NZ on fail
-; OUT -   A - garbage
-; OUT -  BC - garbage
-; OUT -  DE - garbage
-; OUT -  HL - garbage
-; OUT - IXL - garbage
-; OUT - DE' - garbage
-; OUT - HL' - garbage
-fatfs_directory_load_next_window:
-    exx                                             ;
-    ld de, (var_fatfs.dir_window_files_cnt)         ; DE' = files_count_prev
-    ld hl, (var_fatfs.dir_window_cluster_pos)       ; HL' = cluster_pos
-    exx                                             ;
-    ld bc, (var_fatfs.dir_window_cluster_n+0)       ;
-    ld de, (var_fatfs.dir_window_cluster_n+2)       ;
-    ld hl, (var_fatfs.dir_window_sector_pos)        ; L = sector_pos
-    ld a, (var_disk.fatfs.BPB_SecPerClus)           ; if sector_pos is last sector in cluster - get next cluster
-    dec a                                           ; ...
-    cp l                                            ; ...
-    jr z, .next_cluster                             ; ...
-.next_sector:
-    ld h, 0 : inc l                                 ; sector_pos++
-    jr .read                                        ;
-.next_cluster:
-    exx                                             ; cluster_pos++
-    inc hl                                          ; ...
-    exx                                             ; ...
-    call fatfs_get_next_cluster_n                   ; DEBC = next cluster_n
-    ret nz                                          ; ...
-    ld hl, 0                                        ; sector_pos = 0
-.read:
-    call fatfs_directory_load.read                  ;
-    ret nz                                          ;
-    exx                                             ;
-    ld (var_fatfs.dir_window_cluster_pos), hl       ; save cluster_pos
-    ld hl, (var_fatfs.dir_window_first_file_n)      ; first_file += files_count_prev
-    add hl, de                                      ; ...
-    ld (var_fatfs.dir_window_first_file_n), hl      ; ...
-    exx                                             ;
-    ld hl, (var_fatfs.dir_window_files_cnt)         ; no more files?
-    ld a, h : or l                                  ; ...
-    jr nz, 1f                                       ; ...
-    or 1                                            ; ... set NZ flag
-    ret                                             ; ...
-1:  xor a                                           ; set Z flag
-    ret                                             ;
-
-
-; OUT -  F - Z on success, NZ on fail
+; IN  - DE - entry number
+; OUT -  F - NZ when yes, Z when no
 ; OUT -  A - garbage
 ; OUT - BC - garbage
-; OUT - DE - garbage
 ; OUT - HL - garbage
-; OUT - IXL - garbage
-; OUT - HL' - garbage
-fatfs_directory_load_prev_window:
-    exx                                             ;
-    ld hl, (var_fatfs.dir_window_cluster_pos)       ;
-    exx                                             ;
-    ld hl, (var_fatfs.dir_window_cluster_pos)       ;
-    ld a, (var_fatfs.dir_window_sector_pos)         ;
-    or a                                            ; if current sector is first sector in cluster - get prev cluster
-    jr z, .prev_cluster                             ; ...
-.prev_sector:
-    dec a                                           ; sector_pos--
-    ld h, 0 : ld l, a                               ; ...
-    ld bc, (var_fatfs.dir_window_cluster_n+0)       ;
-    ld de, (var_fatfs.dir_window_cluster_n+2)       ;
-    jr .read                                        ;
-.prev_cluster:
-    ld a, h : or l                                  ; already on first cluster in chain?
-    jr nz, 1f                                       ; ...
-    or 1                                            ; ... set NZ flag
-    ret                                             ; ...
-1:  exx                                             ; cluster_pos--
-    dec hl                                          ; ...
-    exx                                             ; ...
-    dec hl                                          ; get prev cluster n
-    ld bc, (var_fatfs.current_dir+0)                ; ...
-    ld de, (var_fatfs.current_dir+2)                ; ...
-    call fatfs_get_nth_cluster_n                    ; ...
-    ret nz                                          ; ...
-    ld hl, (var_disk.fatfs.BPB_SecPerClus)          ; sector_pos = last sector in cluster
-    dec l                                           ;
-    ld h, 0                                         ;
-.read:
-    call fatfs_directory_load.read                  ;
-    ret nz                                          ;
-    ld bc, (var_fatfs.dir_window_files_cnt)         ; first_file -= files_count
-    ld hl, (var_fatfs.dir_window_first_file_n)      ; ...
-    or a                                            ; ...
-    sbc hl, bc                                      ; ...
-    ld (var_fatfs.dir_window_first_file_n), hl      ; ...
-    exx                                             ; save cluster_pos
-    ld (var_fatfs.dir_window_cluster_pos), hl       ; ...
-    exx                                             ; ...
-    xor a                                           ; set Z flag
-    ret                                             ;
-
-
-; IN  - DE - entry number or 0xffff for root directory
-; OUT -  F - Z on success, NZ on fail
-; OUT -  A - garbage
-; OUT - BC - garbage
-; OUT - DE - garbage
-; OUT - HL - garbage
-; OUT - IXL  - garbage
-fatfs_directory_load:
-    ld a, #ff                                       ;
-    cp d : jr nz, .get_dir_info                     ;
-    cp e : jr nz, .get_dir_info                     ;
-    jr z, .root_dir                                 ;
-.get_dir_info:
-    call fatfs_get_entry                            ;
-    ret nz                                          ;
-    ld de, DIR_FstClusHI                            ;
-    add hl, de                                      ;
-    ld e, (hl) : inc hl : ld d, (hl)                ;
-    ld bc, DIR_FstClusLO-DIR_FstClusHI-1            ;
-    add hl, bc                                      ;
-    ld c, (hl) : inc hl : ld b, (hl)                ;
-    ld a, d : or e : or b : or c                    ; if cluster_n == 0 - root directory
-    jr nz, .chdir                                   ; ...
-.root_dir:
-    ld bc, (var_disk.fatfs.BPB_RootClus+0)          ;
-    ld de, (var_disk.fatfs.BPB_RootClus+2)          ;
-.chdir:
-    ld (var_fatfs.current_dir+0), bc                ;
-    ld (var_fatfs.current_dir+2), de                ;
-    ld hl, 0                                        ;
-    ld (var_fatfs.dir_window_first_file_n), hl      ;
-    ld (var_fatfs.dir_window_cluster_pos), hl       ;
-.read:
-    push de                                         ;
-    push bc                                         ;
-    push hl                                         ;
-    call fatfs_get_lba                              ;
-    jr z, 1f                                        ;
-    .3 pop hl                                       ;
-    ret                                             ;
-1:  ld hl, dir_buffer                               ;
-    ld ixl, 1                                       ;
-    call disk_read_sectors                          ;
-    jr z, 1f                                        ;
-    .3 pop hl                                       ;
-    ret                                             ;
-1:  pop hl                                          ;
-    ld a, l                                         ;
-    ld (var_fatfs.dir_window_sector_pos), a         ;
-    pop hl                                          ;
-    ld (var_fatfs.dir_window_cluster_n+0), hl       ;
-    pop hl                                          ;
-    ld (var_fatfs.dir_window_cluster_n+2), hl       ;
-    ; jp fatfs_directory_parse                       ;
-
-
-; OUT -  F - Z=1
-; OUT -  A - garbage
-; OUT - BC - garbage
-; OUT - DE - garbage
-; OUT - HL - garbage
-; OUT - IX - garbage
-fatfs_directory_parse:
-    ld hl, 0                                   ;
-    ld (var_fatfs.dir_window_files_cnt), hl    ;
-    ld ix, dir_buffer                          ; src
-    ld de, dir_buffer                          ; dst
-.loop:
-    ld a, (ix+DIR_Name+0)                      ;
-    or a                                       ; last entry?
-    ret z                                      ; ...
-    push ix                                    ;
-    cp #e5                                     ; deleted entry?
-    jr z, .next                                ; ...
-.handle_dot_dir:
-    cp '.'                                     ; skip directory with name '.'
-    jr nz, .handle_hidden_entries              ; ...
-    ld a, (ix+DIR_Attr)                        ; ...
-    and #10                                    ; ... is directory?
-    jr z, .handle_hidden_entries               ; ...
-    ld a, (ix+DIR_Name+1)                      ; ...
-    cp ' '                                     ; ...
-    jr z, .next                                ; ...
-.handle_dot_dot_dir:
-    cp '.'                                     ; show '..' event if it have system or hidden attribute
-    jr nz, .handle_hidden_entries              ; ...
-    ld a, (ix+DIR_Name+2)                      ; ...
-    cp ' '                                     ; ...
-    jr nz, .handle_hidden_entries              ; ...
-    ld a, (ix+DIR_Attr)                        ; skip volume files
-    and #08                                    ; ...
-    jr nz, .next                               ; ...
-    jr .save_entry                             ;
-.handle_hidden_entries:
-    ld a, (ix+DIR_Attr)                        ; skip hidden, system and volume files
-    and #0e                                    ; ...
-    jr nz, .next                               ; ...
-.save_entry:
-    pop hl                                     ;
-    push hl                                    ;
-    ld bc, 32                                  ; save this entry
-    ldir                                       ; ...
-    ld hl, (var_fatfs.dir_window_files_cnt)    ; cnt++
-    inc hl                                     ; ...
-    ld (var_fatfs.dir_window_files_cnt), hl    ; ...
-.next:
-    pop hl                                     ; check ix+32 >= dir_buffer+512 (sector size)
-    ld bc, #ffff-disk_sector_size-dir_buffer+32+1 ; ...
-    add hl, bc                                 ; ...
-    xor a                                      ; set Z flag
-    ret c                                      ; ...
-    ld bc, 32                                  ;
-    add ix, bc                                 ;
-    jr .loop                                   ;
+fatfs_entry_is_directory:
+    call fatfs_get_entry                       ;
+    ret nz                                     ;
+    ld bc, DIR_Attr                            ;
+    add hl, bc                                 ;
+    ld a, (hl)                                 ;
+    and #10                                    ;
+    ret                                        ;
 
 
 ; IN  - DE - entry number
