@@ -68,7 +68,6 @@ driver         DB
 offset         DD
 disk_param     DB
 fatfs          fatfs_disk_t
-_reserv        BLOCK 1, 0
     ENDS
     STRUCT disks_t
 boot_n         DB

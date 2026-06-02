@@ -19,7 +19,7 @@ Quick demo video: https://www.youtube.com/watch?v=X_hX_dGmGeg
     - DivIDE;
     - NemoIDE;
     - SMUC.
-* Support for FAT32 filesystem;
+* Support for FAT16/FAT32 filesystem;
 * One of supported hardware MIDI synthesizers required:
     - Any 128K spectrum with external MIDI synth (see bellow);
     - [ZX-MultiSound](https://github.com/UzixLS/zx-multisound);
