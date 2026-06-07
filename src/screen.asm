@@ -1,8 +1,8 @@
 screens_base    equ #C000
-screens_page    equ 7
-screen_menu_ptr equ #C002
-screen_play_ptr equ #C004
-screen_help_ptr equ #C006
+screens_page    equ 1
+screen_menu_ptr equ screens_base + 2
+screen_play_ptr equ screens_base + 4
+screen_help_ptr equ screens_base + 6
 
     export screens_base
     export screens_page
@@ -16,6 +16,7 @@ screen_help_ptr equ #C006
 screen_load:
     ld a, #10 + screens_page                  ;
     ld bc, #7ffd                              ;
+    ld (bankm), a                             ;
     out (c), a                                ;
     ld e, (hl)                                ; src
     inc hl                                    ; ...
@@ -25,6 +26,7 @@ screen_load:
     call rle_unpack                           ;
     ld a, #10                                 ;
     ld bc, #7ffd                              ;
+    ld (bankm), a                             ;
     out (c), a                                ;
     ret                                       ;
 

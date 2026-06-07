@@ -7,6 +7,10 @@
     include "config.inc"
     include "layout.inc"
 
+    include "build.inc"
+
+bankm       equ 0x5B5C      ; Copy of last byte output to I/O port 7FFDh (32765).
+
     page 0
     org int_handler-(variables_low_end-begin)
     assert $ >= 0x6000
@@ -46,6 +50,7 @@ int_im2_vector_table:
     include "fatfs.asm"
     include "disk.asm"
     include "trdos.asm"
+    include "zxnextos.asm"
     include "ide.asm"
     include "mmc.asm"
     include "settings.asm"
@@ -68,9 +73,15 @@ main:
     im 2                            ; ...
     ld a, #10                       ; page BASIC48
     ld bc, #7ffd                    ; ...
+    ld (bankm), a                   ; ...
     out (c), a                      ; ...
     call device_detect_cpu_int      ;
+    IFDEF ZXNEXTOS
+    call zxnextos_init
+    ENDIF;ZXNEXTOS
+    IFDEF DOS_TRDOS
     call trdos_init                 ;
+    ENDIF;DOS_TRDOS
     xor a                                         ; hide "hold space for safe mode" message
     ld b, LAYOUT_START_SAFE_MESSAGE_LEN           ; ...
     LD_ATTR_ADDRESS hl, LAYOUT_START_SAFE_MESSAGE ; ...
@@ -119,6 +130,7 @@ main:
 exit:
     xor a        ; page BASIC128
     ld bc, #7ffd ; ...
+    ld (bankm), a; ...
     out (c), a   ; ...
     ld b , #1f   ; ...
     out (c), a   ; ...
@@ -391,6 +403,7 @@ stack_bottom:
 stack_top:
 
 
+    export bankm
     export begin
     export end
     export main

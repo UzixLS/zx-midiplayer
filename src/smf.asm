@@ -51,6 +51,13 @@ SMF_TRACK_FLAGS_DELAY  equ 2
 
 SMF_DEFAULT_TEMPO equ 500000     ; defined by MIDI standard
 
+    IFDEF DOS_PLUS3
+        DEFINE _CHECK_PLUS3_HEADER
+    ELSE;!DOS_PLUS3
+        IFDEF ZXNEXTOS
+            DEFINE _CHECK_PLUS3_HEADER
+        ENDIF;ZXNEXTOS
+    ENDIF;DOS_PLUS3
 
 ; IN  - HL - position of beginning of file
 ; OUT - HL - position of next byte after end of chunk
@@ -154,6 +161,9 @@ smf_parse:
     ld bc, (SMF_DEFAULT_TEMPO>> 0)&0xFFFF : ld (var_smf_file.tempo+0), bc ; set default tempo
     ld bc, (SMF_DEFAULT_TEMPO>>16)&0xFFFF : ld (var_smf_file.tempo+2), bc ; ...
     ld hl, 0                              ; parse file header
+    IFDEF _CHECK_PLUS3_HEADER
+    call smf_skip_plus3_header_if_any	  ; DivMMC knows nothing about PLUS3DOS
+    ENDIF;_CHECK_PLUS3_HEADER
     call smf_parse_file_header_rmi        ; ... skip rmi header if present
     call smf_parse_file_header            ; ...
     ret nz                                ; ... return on error
@@ -507,3 +517,27 @@ smf_handle_meta:
 .exit:
     add hl, de                   ; next position += remaining data len
     ret                          ;
+
+    IFDEF _CHECK_PLUS3_HEADER
+    ; if we read +3 files directly from DivMMC, there is
+    ; nothing to skip PLUS3DOS header for us
+smf_skip_plus3_header_if_any:
+    push hl
+    call .has_plus3_header
+    pop hl
+    ret nz
+    ld bc, 128
+    add hl, bc
+    ret
+.has_plus3_header:    ; PLUS3DOS, we only check PLUS3
+    ; TODO: it may worth to add strcmp(...)
+    call file_get_next_byte : cp 'P' : ret nz
+    call file_get_next_byte : cp 'L' : ret nz
+    call file_get_next_byte : cp 'U' : ret nz
+    call file_get_next_byte : cp 'S' : ret nz
+    call file_get_next_byte : cp '3' : ret nz
+    xor a ; ZF=1
+    ret
+
+        UNDEFINE _CHECK_PLUS3_HEADER
+    ENDIF;_CHECK_PLUS3_HEADER

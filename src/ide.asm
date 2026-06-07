@@ -444,3 +444,28 @@ ide_read_block:
 .err:
     or 1                                 ; set NZ flag
     ret                                  ;
+
+    IFNDEF DOS_TRDOS
+trdos_entrypoint_jump        equ #3d2f
+
+; IN -  A  - port value
+; IN  - BC - port number
+; OUT - HL - garbage
+trdos_out:
+    ld hl, #3ff0                    ; "out (c), a : ret" code in trdos rom (scorpion only!)
+    jr trdos_in.c                   ;
+
+; IN  - BC - port number
+; OUT - A  - port value
+; OUT - HL - garbage
+trdos_in:                           ;
+    ld hl, #3ff3                    ; "in a, (c) : ret" code in trdos rom (scorpion only!)
+.c: call .sub                       ;
+    ei                              ;
+    ret                             ;
+.sub:                               ;
+    push hl                         ;
+    di                              ;
+    jp trdos_entrypoint_jump        ;
+
+    ENDIF ;DOS_TRDOS

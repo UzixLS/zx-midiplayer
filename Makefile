@@ -5,13 +5,14 @@ endif
 
 export PATH:=/cygdrive/c/Hwdev/sjasmplus/:/cygdrive/e/Emulation/ZX Spectrum/Emuls/Es.Pectrum/:${PATH}
 
-SJOPTS = --nologo --fullpath --outprefix=build/ -DVERSION_DEF=\"${VERSION}\" -DVERSIONSHORT_DEF=\"${VERSIONSHORT}\"
+SJOPTS = --nologo --fullpath --outprefix=build/ -DVERSION_DEF=\"${VERSION}\" -DVERSIONSHORT_DEF=\"${VERSIONSHORT}\" $(OPTS)
 
 .PHONY: all clean run
 
 all:
 	@mkdir -p build
 	sjasmplus --msg=war --lst=build/main.lst --exp=build/main.exp --sld=build/main.sld ${SJOPTS} src/main.asm
+	sjasmplus --msg=war --lst=build/assets.lst ${SJOPTS} src/assets.asm
 	sjasmplus --msg=err --lst=build/build.lst ${SJOPTS} src/build.asm
 
 clean:
